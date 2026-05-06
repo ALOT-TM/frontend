@@ -11,6 +11,12 @@
   margin-bottom: 20px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .page-header h2 {
   margin: 0;
   color: #333;
@@ -26,6 +32,21 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s;
+}
+
+.btn-secondary {
+  background: #f3f4f8;
+  color: #2f3342;
+  border: 1px solid #d6d9e6;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+  background: #e6e9f2;
 }
 
 .btn-primary:hover {
@@ -47,6 +68,34 @@
   margin-bottom: 20px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #5a6175;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 24px;
+  color: #2b2f3a;
+}
+
 .beneficiary-form {
   background: white;
   border-radius: 8px;
@@ -59,6 +108,12 @@
   margin-top: 0;
   color: #333;
   font-size: 18px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .form-row {
@@ -107,23 +162,39 @@
   background: white;
   border-radius: 8px;
   padding: 15px;
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin-bottom: 20px;
 }
 
-.filter-section label {
-  font-weight: 600;
-  color: #333;
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.filter-section select {
+.filter-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+}
+
+.filter-group select,
+.filter-group input {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  font-family: inherit;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.12);
 }
 
 .beneficiaries-table {
@@ -177,6 +248,16 @@
   transition: all 0.3s;
 }
 
+.btn-outline {
+  background: transparent;
+  color: #4c5165;
+  border: 1px solid #cfd5e5;
+}
+
+.btn-outline:hover {
+  background: #f3f4f8;
+}
+
 .btn-success {
   background-color: #4caf50;
   color: white;
@@ -213,6 +294,21 @@
   color: #2e7d32;
 }
 
+.product-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.product-chip {
+  background: #eef1fb;
+  color: #3f4a70;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .no-data {
   text-align: center;
   color: #999;
@@ -225,6 +321,11 @@
     flex-direction: column;
     gap: 15px;
     align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
   }
 
   .beneficiaries-table {

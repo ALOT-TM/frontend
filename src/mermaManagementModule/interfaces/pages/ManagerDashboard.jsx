@@ -95,7 +95,7 @@ export const ManagerDashboard = () => {
             📝 Registrar Merma
           </a>
           <a href="/manager/beneficiaries" className="action-btn action-btn-secondary">
-            ➕ Agregar Beneficiario
+            🏫 Ver Beneficiarios
           </a>
           <a href="/manager/donations" className="action-btn action-btn-tertiary">
             🎁 Crear Donación

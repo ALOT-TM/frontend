@@ -9,6 +9,62 @@
   margin-bottom: 30px;
 }
 
+.join-company {
+  background: white;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+}
+
+.join-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.join-header h3 {
+  margin: 0 0 6px;
+  color: #2f3342;
+  font-size: 20px;
+}
+
+.join-user {
+  background: #f2f4f8;
+  color: #4c5165;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.join-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.join-form .form-group {
+  margin-bottom: 0;
+}
+
+.join-form .btn-submit {
+  justify-self: start;
+}
+
+.info-banner {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: #fff6e5;
+  color: #7a4c00;
+  font-size: 14px;
+  border-left: 4px solid #f0b24a;
+}
+
 .error-message {
   background-color: #fee;
   border-left: 4px solid #f00;
@@ -260,6 +316,11 @@
 @media (max-width: 768px) {
   .beneficiary-donations h2 {
     font-size: 24px;
+  }
+
+  .join-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .card-header {
