@@ -3,6 +3,7 @@ import { useAuth } from '../../../shared/hooks/useAuth';
 import MermaQueryService from '../../../mermaManagementModule/application/MermaQueryService';
 import DonationRequestService from '../../application/DonationRequestService';
 import './BeneficiaryDonationsPage.css';
+import CompanyQueryService from '../../../shared/infrastructure/companyQueryService';
 
 export const BeneficiaryDonationsPage = () => {
   const { user, companyId } = useAuth();
@@ -10,6 +11,7 @@ export const BeneficiaryDonationsPage = () => {
 
   const [donableMermas, setDonableMermas] = useState([]);
   const [requests, setRequests] = useState([]);
+  const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedMerma, setSelectedMerma] = useState(null);
@@ -23,15 +25,18 @@ export const BeneficiaryDonationsPage = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [mermasData, requestsData] = await Promise.all([
+      const [mermasData, requestsData, companiesData] = await Promise.all([
         MermaQueryService.listDonableMermas(companyId),
         beneficiaryId
           ? DonationRequestService.listRequestsByBeneficiary(beneficiaryId)
           : Promise.resolve([]),
+        // fetch companies to resolve names
+        CompanyQueryService.listCompanies(),
       ]);
 
       setDonableMermas(Array.isArray(mermasData) ? mermasData : []);
       setRequests(Array.isArray(requestsData) ? requestsData : []);
+      setCompanies(Array.isArray(companiesData) ? companiesData : []);
       setError('');
     } catch (err) {
       setError(err.message || 'Error al cargar la vista de beneficiario');
@@ -224,6 +229,15 @@ export const BeneficiaryDonationsPage = () => {
                   <div className="info-row">
                     <label>Beneficiario</label>
                     <span>#{request.beneficiaryReferenceId}</span>
+                  </div>
+                  <div className="info-row">
+                    <label>Compañía</label>
+                    <span>{(() => {
+                      const cid = request.companyId?.value ?? request.companyId ?? null;
+                      if (!cid) return '-';
+                      const found = companies.find(c => String(c.id) === String(cid));
+                      return found ? found.name : `#${cid}`;
+                    })()}</span>
                   </div>
                   <div className="info-row">
                     <label>Notas</label>
