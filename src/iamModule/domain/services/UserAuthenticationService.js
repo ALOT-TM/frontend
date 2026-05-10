@@ -1,51 +1,20 @@
 import apiClient from '../../../shared/infrastructure/apiClient';
-
-const pickUserId = (user) => {
-  if (!user) {
-    return null;
-  }
-
-  return (
-    user?.id ??
-    user?.userId ??
-    user?.userId?.value ??
-    user?.id?.value ??
-    user?.userIdValue ??
-    user?.userId?.id ??
-    null
-  );
-};
-
-const pickToken = (user) => {
-  if (!user) {
-    return null;
-  }
-
-  return (
-    user?.token ??
-    user?.accessToken ??
-    user?.jwt ??
-    user?.jwtToken ??
-    user?.authToken ??
-    null
-  );
-};
-
-const isJwtLike = (token) => {
-  if (!token || typeof token !== 'string') {
-    return false;
-  }
-  const parts = token.split('.');
-  return parts.length === 3 && parts.every((part) => part.length > 0);
-};
+import {
+  clearAuthSession,
+  getStoredAuthToken,
+  persistAuthSession,
+  readAuthSession,
+  isJwtLike,
+} from '../../../shared/infrastructure/authStorage';
 
 class UserAuthenticationService {
-  async register(email, rawPassword, role) {
+  async register(email, rawPassword, role, companyId = null) {
     try {
       const response = await apiClient.post('/iam/register', {
         email,
         rawPassword,
         role,
+        companyId,
       });
       return response.data;
     } catch (error) {
@@ -61,40 +30,26 @@ class UserAuthenticationService {
       });
 
       if (response.data) {
-        const userId = pickUserId(response.data);
-        const token = pickToken(response.data);
-
-        localStorage.setItem('user', JSON.stringify(response.data));
-        if (userId) {
-          localStorage.setItem('userId', String(userId));
-        }
-
-        if (isJwtLike(token)) {
-          localStorage.setItem('authToken', token);
-        } else {
-          localStorage.removeItem('authToken');
-        }
+        const session = persistAuthSession(response.data);
+        return session;
       }
 
-      return response.data;
+      return null;
     } catch (error) {
       throw error.response?.data || error.message;
     }
   }
 
   logout() {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('userId');
+    clearAuthSession();
   }
 
   getCurrentUser() {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
+    return readAuthSession()?.user ?? null;
   }
 
   isAuthenticated() {
-    return !!localStorage.getItem('authToken');
+    return isJwtLike(getStoredAuthToken());
   }
 
   getUserRole() {

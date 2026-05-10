@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import MermaCommandService from '../../application/MermaCommandService';
 import MermaQueryService from '../../application/MermaQueryService';
+import DonationRequestService from '../../../donationsManagementModule/application/DonationRequestService';
+import { useAuth } from '../../../shared/hooks/useAuth';
 import './MermaManagement.css';
 
 export const MermaManagementPage = () => {
+  const { companyId } = useAuth();
+  const resolvedCompanyId = useMemo(() => companyId ?? null, [companyId]);
+
   const [mermaList, setMermaList] = useState([]);
+  const [requestsByMerma, setRequestsByMerma] = useState({});
+  const [selectedRequest, setSelectedRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -20,17 +27,51 @@ export const MermaManagementPage = () => {
 
   useEffect(() => {
     fetchMermas();
-  }, [filterStatus]);
+  }, [filterStatus, resolvedCompanyId]);
+
+  useEffect(() => {
+    const loadRequests = async () => {
+      const candidateMermas = mermaList.filter((merma) => merma.status === 'DONABLE' || merma.status === 'IN_PROCESS');
+      if (candidateMermas.length === 0) {
+        setRequestsByMerma({});
+        return;
+      }
+
+      try {
+        const entries = await Promise.all(
+          candidateMermas.map(async (merma) => {
+            const requests = await DonationRequestService.listRequestsByMerma(merma.id);
+            return [merma.id, Array.isArray(requests) ? requests : []];
+          })
+        );
+        setRequestsByMerma(Object.fromEntries(entries));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadRequests();
+  }, [mermaList]);
 
   const fetchMermas = async () => {
     setLoading(true);
     try {
-      let data;
+      let data = [];
       if (filterStatus) {
-        data = await MermaQueryService.listMermasByStatus(filterStatus);
+        const allByStatus = await MermaQueryService.listMermasByStatus(filterStatus);
+        data = Array.isArray(allByStatus)
+          ? allByStatus.filter((merma) => {
+              if (!resolvedCompanyId) {
+                return true;
+              }
+              const mermaCompanyId = merma.companyId?.value ?? merma.companyId ?? null;
+              return String(mermaCompanyId) === String(resolvedCompanyId);
+            })
+          : [];
       } else {
-        data = await MermaQueryService.listAllMermas();
+        data = await MermaQueryService.listMermasByCompany(resolvedCompanyId);
       }
+
       setMermaList(Array.isArray(data) ? data : []);
       setError('');
     } catch (err) {
@@ -43,7 +84,7 @@ export const MermaManagementPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -56,7 +97,7 @@ export const MermaManagementPage = () => {
       await MermaCommandService.registerMerma(
         formData.productName,
         formData.categoryName,
-        parseInt(formData.quantity),
+        parseInt(formData.quantity, 10),
         formData.expirationDate,
         formData.reason
       );
@@ -94,12 +135,43 @@ export const MermaManagementPage = () => {
     }
   };
 
+  const refreshRequestsForMerma = async (mermaId) => {
+    const requests = await DonationRequestService.listRequestsByMerma(mermaId);
+    setRequestsByMerma((prev) => ({
+      ...prev,
+      [mermaId]: Array.isArray(requests) ? requests : [],
+    }));
+  };
+
+  const handleAcceptRequest = async (requestId, mermaId) => {
+    try {
+      await DonationRequestService.acceptRequest(requestId);
+      await fetchMermas();
+      await refreshRequestsForMerma(mermaId);
+      setSelectedRequest(null);
+    } catch (err) {
+      setError(err.message || 'Error al aceptar solicitud');
+    }
+  };
+
+  const handleRejectRequest = async (requestId, mermaId) => {
+    try {
+      await DonationRequestService.rejectRequest(requestId);
+      await fetchMermas();
+      await refreshRequestsForMerma(mermaId);
+      setSelectedRequest(null);
+    } catch (err) {
+      setError(err.message || 'Error al rechazar solicitud');
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusMap = {
-      'REGISTERED': 'badge-gray',
-      'DONABLE': 'badge-green',
-      'NOT_DONABLE': 'badge-red',
-      'DONATED': 'badge-blue',
+      REGISTERED: 'badge-gray',
+      DONABLE: 'badge-green',
+      IN_PROCESS: 'badge-purple',
+      NOT_DONABLE: 'badge-red',
+      DONATED: 'badge-blue',
     };
     return statusMap[status] || 'badge-gray';
   };
@@ -118,7 +190,6 @@ export const MermaManagementPage = () => {
       {showForm && (
         <form className="merma-form" onSubmit={handleRegisterMerma}>
           <h3>Registrar Nueva Merma</h3>
-
           <div className="form-row">
             <div className="form-group">
               <label>Nombre del Producto *</label>
@@ -132,7 +203,6 @@ export const MermaManagementPage = () => {
                 disabled={submitting}
               />
             </div>
-
             <div className="form-group">
               <label>Categoría *</label>
               <input
@@ -146,7 +216,6 @@ export const MermaManagementPage = () => {
               />
             </div>
           </div>
-
           <div className="form-row">
             <div className="form-group">
               <label>Cantidad *</label>
@@ -161,7 +230,6 @@ export const MermaManagementPage = () => {
                 disabled={submitting}
               />
             </div>
-
             <div className="form-group">
               <label>Fecha de Vencimiento *</label>
               <input
@@ -174,7 +242,6 @@ export const MermaManagementPage = () => {
               />
             </div>
           </div>
-
           <div className="form-row">
             <div className="form-group">
               <label>Motivo de Merma *</label>
@@ -190,7 +257,6 @@ export const MermaManagementPage = () => {
               </select>
             </div>
           </div>
-
           <button type="submit" className="btn-primary" disabled={submitting}>
             {submitting ? '⏳ Registrando...' : '✅ Registrar Merma'}
           </button>
@@ -203,6 +269,7 @@ export const MermaManagementPage = () => {
           <option value="">Todos</option>
           <option value="REGISTERED">Registrado</option>
           <option value="DONABLE">Donable</option>
+          <option value="IN_PROCESS">En proceso</option>
           <option value="NOT_DONABLE">No Donable</option>
           <option value="DONATED">Donado</option>
         </select>
@@ -213,57 +280,116 @@ export const MermaManagementPage = () => {
       ) : mermaList.length === 0 ? (
         <p className="no-data">No hay mermas registradas</p>
       ) : (
-        <div className="mermas-table">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Producto</th>
-                <th>Categoría</th>
-                <th>Cantidad</th>
-                <th>Vencimiento</th>
-                <th>Estado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mermaList.map((merma) => (
-                <tr key={merma.id}>
-                  <td>#{merma.id}</td>
-                  <td>{merma.productName}</td>
-                  <td>{merma.categoryName}</td>
-                  <td>{merma.quantity}</td>
-                  <td>{new Date(merma.expirationDate).toLocaleDateString()}</td>
-                  <td>
-                    <span className={`badge ${getStatusBadge(merma.status)}`}>
-                      {merma.status}
-                    </span>
-                  </td>
-                  <td className="actions-cell">
-                    {merma.status === 'REGISTERED' && (
-                      <>
-                        <button
-                          className="btn-small btn-success"
-                          onClick={() => handleMarkDonable(merma.id)}
-                        >
-                          ✅ Donable
-                        </button>
-                        <button
-                          className="btn-small btn-danger"
-                          onClick={() => handleMarkNotDonable(merma.id)}
-                        >
-                          ❌ No Donable
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="merma-grid">
+          {mermaList.map((merma) => {
+            const requests = requestsByMerma[merma.id] || [];
+            return (
+              <article key={merma.id} className={`merma-card status-${String(merma.status).toLowerCase()}`}>
+                <div className="merma-card-header">
+                  <div>
+                    <h3>{merma.productName}</h3>
+                    <p>{merma.categoryName}</p>
+                  </div>
+                  <span className={`badge ${getStatusBadge(merma.status)}`}>{merma.status}</span>
+                </div>
+
+                <div className="merma-card-body">
+                  <div className="info-row">
+                    <label>Cantidad</label>
+                    <span>{merma.quantity}</span>
+                  </div>
+                  <div className="info-row">
+                    <label>Vencimiento</label>
+                    <span>{new Date(merma.expirationDate).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {merma.status === 'REGISTERED' && (
+                  <div className="actions-cell">
+                    <button type="button" className="btn-small btn-success" onClick={() => handleMarkDonable(merma.id)}>
+                      ✅ Donable
+                    </button>
+                    <button type="button" className="btn-small btn-danger" onClick={() => handleMarkNotDonable(merma.id)}>
+                      ❌ No Donable
+                    </button>
+                  </div>
+                )}
+
+                {(merma.status === 'DONABLE' || merma.status === 'IN_PROCESS') && (
+                  <div className="request-pills-wrap">
+                    <div className="request-pills-title">Solicitudes</div>
+                    <div className="request-pills">
+                      {requests.length === 0 ? (
+                        <span className="request-pill empty">Sin solicitudes</span>
+                      ) : (
+                        requests.map((request) => (
+                          <button
+                            key={request.id}
+                            type="button"
+                            className={`request-pill status-${String(request.status || 'pending').toLowerCase()}`}
+                            onClick={() => setSelectedRequest({ ...request, merma })}
+                          >
+                            #{request.id} {request.status}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
+      )}
+
+      {selectedRequest && (
+        <section className="request-detail-panel">
+          <div className="request-detail-header">
+            <div>
+              <h3>Solicitud #{selectedRequest.id}</h3>
+              <p>
+                Merma #{selectedRequest.merma?.id} - {selectedRequest.merma?.productName}
+              </p>
+            </div>
+            <span className={`badge ${selectedRequest.status === 'PENDING' ? 'badge-gray' : 'badge-blue'}`}>
+              {selectedRequest.status}
+            </span>
+          </div>
+
+          <div className="info-row">
+            <label>Beneficiario</label>
+            <span>#{selectedRequest.beneficiaryReferenceId}</span>
+          </div>
+          <div className="info-row">
+            <label>Notas</label>
+            <span>{selectedRequest.notes || '-'}</span>
+          </div>
+
+          <div className="button-group">
+            {selectedRequest.status === 'PENDING' && (
+              <>
+                <button
+                  type="button"
+                  className="btn-success"
+                  onClick={() => handleAcceptRequest(selectedRequest.id, selectedRequest.merma.id)}
+                >
+                  Aceptar
+                </button>
+                <button
+                  type="button"
+                  className="btn-danger"
+                  onClick={() => handleRejectRequest(selectedRequest.id, selectedRequest.merma.id)}
+                >
+                  Rechazar
+                </button>
+              </>
+            )}
+            <button type="button" className="btn-cancel" onClick={() => setSelectedRequest(null)}>
+              Cerrar
+            </button>
+          </div>
+        </section>
       )}
     </div>
   );
 };
-

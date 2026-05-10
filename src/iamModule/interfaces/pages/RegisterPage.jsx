@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../../shared/hooks/useAuth';
+import CompanyQueryService from '../../../shared/infrastructure/companyQueryService';
 import './AuthPage.css';
 
 export const RegisterPage = () => {
@@ -8,10 +9,34 @@ export const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState('BENEFICIARY');
+  const [companyId, setCompanyId] = useState('');
+  const [companies, setCompanies] = useState([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { register, login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (role !== 'MANAGER') {
+      setCompanyId('');
+      return;
+    }
+
+    const loadCompanies = async () => {
+      setLoadingCompanies(true);
+      try {
+        const data = await CompanyQueryService.listCompanies();
+        setCompanies(Array.isArray(data) ? data : []);
+      } catch (err) {
+        setError(err.message || 'Error al cargar compañías');
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+
+    loadCompanies();
+  }, [role]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,13 +52,19 @@ export const RegisterPage = () => {
       return;
     }
 
+    if (role === 'MANAGER' && !companyId) {
+      setError('Selecciona una compañía para el usuario retail');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await register(email, password, role);
-      await login(email, password);
+      await register(email, password, role, role === 'MANAGER' ? Number(companyId) : null);
+      const session = await login(email, password);
+      const nextRole = session?.user?.role ?? role;
 
-      if (role === 'MANAGER') {
+      if (nextRole === 'MANAGER') {
         navigate('/manager/dashboard');
       } else {
         navigate('/beneficiary/donations');
@@ -70,15 +101,44 @@ export const RegisterPage = () => {
           <div className="form-group">
             <label htmlFor="role">Tipo de Usuario</label>
             <select
-                name="type"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                disabled={loading}
-              >
-                <option value="BENEFICIARY">Beneficiario</option>
-                <option value="MANAGER">Gerente de Retail</option>
-              </select>
+              name="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              disabled={loading}
+            >
+              <option value="BENEFICIARY">Beneficiario</option>
+              <option value="MANAGER">Gerente de Retail</option>
+            </select>
           </div>
+
+          {role === 'MANAGER' && (
+            <div className="form-group">
+              <label htmlFor="companyId">Compañía *</label>
+              <select
+                id="companyId"
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+                disabled={loading || loadingCompanies}
+                required
+              >
+                <option value="">Selecciona una compañía</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name} {company.headquarters ? `- ${company.headquarters}` : ''}
+                  </option>
+                ))}
+              </select>
+              <small className="field-help">
+                Este valor se enviará como `companyId` en el registro.
+              </small>
+            </div>
+          )}
+
+          {role === 'BENEFICIARY' && (
+            <div className="info-banner" style={{ marginBottom: 20 }}>
+              Los beneficiarios no se asocian a una compañía.
+            </div>
+          )}
 
           <div className="form-group">
             <label htmlFor="password">Contraseña</label>

@@ -17,11 +17,15 @@ export const LoginPage = () => {
     setLoading(true);
 
     try {
-      const user = await login(email, password);
-      if (user.role === 'MANAGER') {
+      const session = await login(email, password);
+      const role = session?.user?.role;
+
+      if (role === 'MANAGER') {
         navigate('/manager/dashboard');
-      } else if (user.role === 'BENEFICIARY') {
+      } else if (role === 'BENEFICIARY') {
         navigate('/beneficiary/donations');
+      } else {
+        navigate('/login');
       }
     } catch (err) {
       setError(err.message || 'Error al iniciar sesión');

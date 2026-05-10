@@ -223,6 +223,183 @@
   color: #1565c0;
 }
 
+.badge-purple {
+  background-color: #e1bee7;
+  color: #6a1b9a;
+}
+
+.merma-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.merma-card {
+  background: white;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 5px solid #ccc;
+}
+
+.merma-card.status-donable {
+  border-left-color: #4caf50;
+}
+
+.merma-card.status-in_process {
+  border-left-color: #9c27b0;
+}
+
+.merma-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.merma-card-header h3 {
+  margin: 0;
+}
+
+.merma-card-header p {
+  margin: 4px 0 0;
+  color: #666;
+}
+
+.request-pills-wrap {
+  margin-top: 14px;
+}
+
+.request-pills-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6c7280;
+  margin-bottom: 8px;
+}
+
+.request-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.request-pill {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.request-pill:hover {
+  transform: translateY(-1px);
+}
+
+.request-pill.empty {
+  background: #f2f4f8;
+  color: #6c7280;
+  cursor: default;
+}
+
+.request-pill.status-pending {
+  background: #fff3cd;
+  color: #8a5a00;
+}
+
+.request-pill.status-accepted {
+  background: #d1f2d7;
+  color: #1b5e20;
+}
+
+.request-pill.status-rejected {
+  background: #ffd6d6;
+  color: #8e1b1b;
+}
+
+.request-pill.status-cancelled {
+  background: #e0e0e0;
+  color: #666;
+}
+
+.request-pill.status-completed {
+  background: #d7e7ff;
+  color: #134b8b;
+}
+
+.request-detail-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-top: 16px;
+}
+
+.request-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.request-detail-header h3 {
+  margin: 0;
+}
+
+.request-detail-header p {
+  margin: 4px 0 0;
+  color: #666;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.btn-cancel {
+  background-color: #e0e0e0;
+  color: #333;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-cancel:hover {
+  background-color: #d0d0d0;
+}
+
+.request-pill.status-cancelled {
+  background: #e0e0e0;
+  color: #666;
+}
+
+.request-pill.status-completed {
+  background: #d7e7ff;
+  color: #134b8b;
+}
+
+.request-detail-panel {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.request-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .no-data {
   text-align: center;
   color: #999;

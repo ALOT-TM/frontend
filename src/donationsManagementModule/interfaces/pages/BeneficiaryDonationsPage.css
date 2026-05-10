@@ -55,6 +55,13 @@
   justify-self: start;
 }
 
+.field-help {
+  display: block;
+  margin-top: 6px;
+  color: #6c7280;
+  font-size: 12px;
+}
+
 .info-banner {
   margin-top: 16px;
   padding: 12px 16px;
@@ -167,6 +174,11 @@
 .status-badge.status-confirmed {
   background-color: #c8e6c9;
   color: #2e7d32;
+}
+
+.status-badge.status-pending {
+  background-color: #e8eaf6;
+  color: #3949ab;
 }
 
 .card-body {

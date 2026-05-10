@@ -1,10 +1,12 @@
 import React, { createContext, useState, useCallback } from 'react';
 import UserAuthenticationService from '../../../iamModule/domain/services/UserAuthenticationService';
+import { readAuthSession } from '../authStorage';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => UserAuthenticationService.getCurrentUser());
+  const [session, setSession] = useState(() => readAuthSession());
+  const [user, setUser] = useState(() => readAuthSession()?.user ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -12,9 +14,10 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     setError(null);
     try {
-      const loginUser = await UserAuthenticationService.login(email, password);
-      setUser(loginUser);
-      return loginUser;
+      const loginSession = await UserAuthenticationService.login(email, password);
+      setSession(loginSession);
+      setUser(loginSession?.user ?? null);
+      return loginSession;
     } catch (err) {
       setError(err);
       throw err;
@@ -23,11 +26,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const register = useCallback(async (email, password, role) => {
+  const register = useCallback(async (email, password, role, companyId = null) => {
     setLoading(true);
     setError(null);
     try {
-      await UserAuthenticationService.register(email, password, role);
+      await UserAuthenticationService.register(email, password, role, companyId);
       return true;
     } catch (err) {
       setError(err);
@@ -39,18 +42,23 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(() => {
     UserAuthenticationService.logout();
+    setSession(null);
     setUser(null);
   }, []);
 
   const value = {
     user,
+    session,
     loading,
     error,
     login,
     register,
     logout,
-    isAuthenticated: !!user,
+    isAuthenticated: !!session?.token,
     userRole: user?.role || null,
+    userId: session?.userId ?? user?.id ?? null,
+    companyId: session?.companyId ?? user?.companyId ?? null,
+    authToken: session?.token ?? null,
   };
 
   return (
