@@ -92,6 +92,15 @@ export const BeneficiaryDonationsPage = () => {
     return new Date(value).toLocaleDateString();
   };
 
+  const resolveCompanyName = (companyIdValue) => {
+    const cid = companyIdValue?.value ?? companyIdValue ?? null;
+    if (!cid) {
+      return '-';
+    }
+    const found = companies.find((company) => String(company.id) === String(cid));
+    return found ? found.name : `#${cid}`;
+  };
+
   return (
     <div className="beneficiary-donations">
       <h2>Merma donable y solicitudes</h2>
@@ -132,6 +141,10 @@ export const BeneficiaryDonationsPage = () => {
                     <span>{merma.categoryName}</span>
                   </div>
                   <div className="info-row">
+                    <label>Compañía</label>
+                    <span>{resolveCompanyName(merma.companyId)}</span>
+                  </div>
+                  <div className="info-row">
                     <label>Cantidad</label>
                     <span>{merma.quantity}</span>
                   </div>
@@ -170,11 +183,15 @@ export const BeneficiaryDonationsPage = () => {
           <form className="join-form" onSubmit={handleSubmitRequest}>
             <div className="form-group">
               <label>Beneficiario</label>
-              <input type="text" value={beneficiaryId || ''} readOnly />
+              <input type="text" value={user?.email || beneficiaryId || ''} readOnly />
             </div>
             <div className="form-group">
               <label>Merma</label>
-              <input type="text" value={`${selectedMerma.productName} (#${selectedMerma.id})`} readOnly />
+              <input
+                type="text"
+                value={`${selectedMerma.productName} (x${selectedMerma.quantity})`}
+                readOnly
+              />
             </div>
             <div className="form-group">
               <label>Notas *</label>
@@ -232,12 +249,7 @@ export const BeneficiaryDonationsPage = () => {
                   </div>
                   <div className="info-row">
                     <label>Compañía</label>
-                    <span>{(() => {
-                      const cid = request.companyId?.value ?? request.companyId ?? null;
-                      if (!cid) return '-';
-                      const found = companies.find(c => String(c.id) === String(cid));
-                      return found ? found.name : `#${cid}`;
-                    })()}</span>
+                    <span>{resolveCompanyName(request.companyId)}</span>
                   </div>
                   <div className="info-row">
                     <label>Notas</label>
