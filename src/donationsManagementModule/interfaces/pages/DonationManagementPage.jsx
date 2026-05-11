@@ -32,7 +32,8 @@ export const DonationManagementPage = () => {
         filterStatus
           ? DonationQueryService.listDonationsByStatus(filterStatus)
           : DonationQueryService.listAllDonations(),
-        MermaQueryService.listMermasByStatus('DONABLE'),
+        // CORRECCIÓN 1: Usamos la ruta dedicada para mermas donables
+        MermaQueryService.listDonableMermas(),
         BeneficiaryQueryService.listBeneficiariesByStatus('ACTIVE'),
       ]);
 
@@ -148,7 +149,8 @@ export const DonationManagementPage = () => {
                 <option value="">-- Elige un beneficiario --</option>
                 {beneficiaries.map(b => (
                   <option key={b.id} value={b.id}>
-                    {b.beneficiaryName} ({b.type})
+                    {/* CORRECCIÓN 2: Aseguramos que el nombre se muestre correctamente */}
+                    {b.beneficiaryName || b.name} ({b.type})
                   </option>
                 ))}
               </select>
@@ -251,4 +253,3 @@ export const DonationManagementPage = () => {
     </div>
   );
 };
-

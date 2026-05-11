@@ -52,22 +52,41 @@ export const BeneficiaryManagementPage = () => {
     }));
   };
 
+  // ESTA ES LA FUNCIÓN QUE TE FALTABA PARA CREAR UNO NUEVO
+  const handleCreateNew = () => {
+    setEditingId(null);
+    setFormData({
+      name: '',
+      type: 'SCHOOL',
+      address: '',
+      acceptedProducts: '',
+    });
+    setShowForm(true);
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!editingId) {
-      setError('Selecciona un beneficiario para editar.');
-      return;
-    }
     setSubmitting(true);
     try {
       const products = formData.acceptedProducts.split(',').map(p => p.trim()).filter(p => p);
-      await BeneficiaryCommandService.updateBeneficiary(
-        editingId,
-        formData.name,
-        formData.type,
-        formData.address,
-        products
-      );
+      
+      if (editingId) {
+        await BeneficiaryCommandService.updateBeneficiary(
+          editingId,
+          formData.name,
+          formData.type,
+          formData.address,
+          products
+        );
+      } else {
+        await BeneficiaryCommandService.registerBeneficiary(
+          formData.name,
+          formData.type,
+          formData.address,
+          products
+        );
+      }
+
       setFormData({
         name: '',
         type: 'SCHOOL',
@@ -176,13 +195,19 @@ export const BeneficiaryManagementPage = () => {
       return nameA.localeCompare(nameB);
     });
 
-
-
   return (
     <div className="beneficiary-management">
       <div className="page-header">
         <h2>Gestión de Beneficiarios</h2>
         <div className="header-actions">
+          {/* AQUÍ ESTÁ EL BOTÓN QUE TE FALTABA */}
+          <button 
+            className="btn-primary" 
+            onClick={handleCreateNew}
+            style={{ marginRight: '10px' }}
+          >
+            ➕ Nuevo Beneficiario
+          </button>
           <button
             className="btn-secondary"
             onClick={fetchBeneficiaries}
@@ -212,7 +237,7 @@ export const BeneficiaryManagementPage = () => {
 
       {showForm && (
         <form className="beneficiary-form" onSubmit={handleRegister}>
-          <h3>Editar Beneficiario</h3>
+          <h3>{editingId ? 'Editar Beneficiario' : 'Crear Nuevo Beneficiario'}</h3>
 
           <div className="form-row">
             <div className="form-group">
@@ -400,4 +425,3 @@ export const BeneficiaryManagementPage = () => {
     </div>
   );
 };
-

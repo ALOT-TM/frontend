@@ -23,9 +23,25 @@ class BeneficiaryQueryService {
 
   async listAllBeneficiaries() {
     try {
-      // Backend defaults to ACTIVE status when no status param provided
-      const response = await apiClient.get('/beneficiaries');
-      return response.data;
+      const statuses = ['ACTIVE', 'INACTIVE'];
+      const results = await Promise.all(
+        statuses.map((status) => this.listBeneficiariesByStatus(status))
+      );
+      
+      const merged = results.flat().filter(Boolean);
+      
+      const seen = new Set();
+      return merged.filter((item) => {
+        const id = item?.id;
+        if (id === null || id === undefined) {
+          return true;
+        }
+        if (seen.has(id)) {
+          return false;
+        }
+        seen.add(id);
+        return true;
+      });
     } catch (error) {
       throw error.response?.data || error.message;
     }
