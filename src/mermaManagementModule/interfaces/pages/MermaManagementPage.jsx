@@ -6,6 +6,18 @@ import { useAuth } from '../../../shared/hooks/useAuth';
 import './MermaManagement.css';
 
 export const MermaManagementPage = () => {
+  const categoryOptions = [
+    'Frutas',
+    'Verduras',
+    'Carnes',
+    'Lácteos',
+    'Panadería',
+    'Cereales',
+    'Conservas',
+    'Abarrotes',
+    'Bebidas',
+    'Preparados',
+  ];
   const { companyId } = useAuth();
   const resolvedCompanyId = useMemo(() => companyId ?? null, [companyId]);
 
@@ -16,7 +28,7 @@ export const MermaManagementPage = () => {
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     productName: '',
-    categoryName: '',
+    categoryName: categoryOptions[0],
     quantity: '',
     expirationDate: '',
     reason: 'EXPIRATION',
@@ -24,10 +36,11 @@ export const MermaManagementPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
 
   useEffect(() => {
     fetchMermas();
-  }, [filterStatus, resolvedCompanyId]);
+  }, [filterStatus, filterCategory, resolvedCompanyId]);
 
   useEffect(() => {
     const loadRequests = async () => {
@@ -72,6 +85,13 @@ export const MermaManagementPage = () => {
         data = await MermaQueryService.listMermasByCompany(resolvedCompanyId);
       }
 
+      if (filterCategory) {
+        data = data.filter((merma) => {
+          const mermaCategory = merma.categoryName?.value ?? merma.categoryName ?? '';
+          return String(mermaCategory) === String(filterCategory);
+        });
+      }
+
       setMermaList(Array.isArray(data) ? data : []);
       setError('');
     } catch (err) {
@@ -103,7 +123,7 @@ export const MermaManagementPage = () => {
       );
       setFormData({
         productName: '',
-        categoryName: '',
+        categoryName: categoryOptions[0],
         quantity: '',
         expirationDate: '',
         reason: 'EXPIRATION',
@@ -205,15 +225,19 @@ export const MermaManagementPage = () => {
             </div>
             <div className="form-group">
               <label>Categoría *</label>
-              <input
-                type="text"
+              <select
                 name="categoryName"
                 value={formData.categoryName}
                 onChange={handleInputChange}
                 required
-                placeholder="ej: Lácteos"
                 disabled={submitting}
-              />
+              >
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="form-row">
@@ -272,6 +296,15 @@ export const MermaManagementPage = () => {
           <option value="IN_PROCESS">En proceso</option>
           <option value="NOT_DONABLE">No Donable</option>
           <option value="DONATED">Donado</option>
+        </select>
+        <label>Filtrar por Categoría:</label>
+        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+          <option value="">Todas</option>
+          {categoryOptions.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
         </select>
       </div>
 
