@@ -3,6 +3,7 @@ import DonationCommandService from '../../application/DonationCommandService';
 import DonationQueryService from '../../application/DonationQueryService';
 import MermaQueryService from '../../../mermaManagementModule/application/MermaQueryService';
 import BeneficiaryQueryService from '../../../beneficiariesManagementModule/application/BeneficiaryQueryService';
+import Icon from '../../../shared/components/Icon';
 import './DonationManagement.css';
 
 export const DonationManagementPage = () => {
@@ -108,7 +109,7 @@ export const DonationManagementPage = () => {
       <div className="page-header">
         <h2>Gestión de Donaciones</h2>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '❌ Cancelar' : '➕ Nueva Donación'}
+          {showForm ? <><Icon name="close" size={16} /> Cancelar</> : <><Icon name="plus" size={16} /> Nueva Donación</>}
         </button>
       </div>
 
@@ -186,7 +187,7 @@ export const DonationManagementPage = () => {
           </div>
 
           <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? '⏳ Creando...' : '✅ Crear Donación'}
+            {submitting ? <><Icon name="loading" size={16} /> Creando...</> : <><Icon name="check" size={16} /> Crear Donación</>}
           </button>
         </form>
       )}
@@ -229,9 +230,9 @@ export const DonationManagementPage = () => {
                   <td>{new Date(donation.scheduledDeliveryDate).toLocaleDateString()}</td>
                   <td>
                     <span className={`badge ${getStatusBadge(donation.status)}`}>
-                      {donation.status === 'ASSIGNED' && '📋 Asignada'}
-                      {donation.status === 'DELIVERED' && '🚚 Entregada'}
-                      {donation.status === 'CONFIRMED' && '✅ Confirmada'}
+                      {donation.status === 'ASSIGNED' && <><Icon name="clipboard" size={14} /> Asignada</>}
+                      {donation.status === 'DELIVERED' && <><Icon name="truck" size={14} /> Entregada</>}
+                      {donation.status === 'CONFIRMED' && <><Icon name="check" size={14} /> Confirmada</>}
                     </span>
                   </td>
                   <td className="actions-cell">

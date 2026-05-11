@@ -3,6 +3,7 @@ import MermaCommandService from '../../application/MermaCommandService';
 import MermaQueryService from '../../application/MermaQueryService';
 import DonationRequestService from '../../../donationsManagementModule/application/DonationRequestService';
 import { useAuth } from '../../../shared/hooks/useAuth';
+import Icon from '../../../shared/components/Icon';
 import './MermaManagement.css';
 
 export const MermaManagementPage = () => {
@@ -201,7 +202,7 @@ export const MermaManagementPage = () => {
       <div className="page-header">
         <h2>Gestión de Merma</h2>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? '❌ Cancelar' : '➕ Nueva Merma'}
+          {showForm ? <><Icon name="close" size={16} /> Cancelar</> : <><Icon name="plus" size={16} /> Nueva Merma</>}
         </button>
       </div>
 
@@ -282,7 +283,7 @@ export const MermaManagementPage = () => {
             </div>
           </div>
           <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? '⏳ Registrando...' : '✅ Registrar Merma'}
+            {submitting ? <><Icon name="loading" size={16} /> Registrando...</> : <><Icon name="check" size={16} /> Registrar Merma</>}
           </button>
         </form>
       )}
@@ -340,10 +341,10 @@ export const MermaManagementPage = () => {
                 {merma.status === 'REGISTERED' && (
                   <div className="actions-cell">
                     <button type="button" className="btn-small btn-success" onClick={() => handleMarkDonable(merma.id)}>
-                      ✅ Donable
+                      <Icon name="check" size={16} /> Donable
                     </button>
                     <button type="button" className="btn-small btn-danger" onClick={() => handleMarkNotDonable(merma.id)}>
-                      ❌ No Donable
+                      <Icon name="close" size={16} /> No Donable
                     </button>
                   </div>
                 )}

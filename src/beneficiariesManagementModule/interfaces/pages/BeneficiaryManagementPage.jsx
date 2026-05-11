@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BeneficiaryCommandService from '../../application/BeneficiaryCommandService';
 import BeneficiaryQueryService from '../../application/BeneficiaryQueryService';
+import Icon from '../../../shared/components/Icon';
 import './BeneficiaryManagement.css';
 
 export const BeneficiaryManagementPage = () => {
@@ -206,7 +207,7 @@ export const BeneficiaryManagementPage = () => {
             onClick={handleCreateNew}
             style={{ marginRight: '10px' }}
           >
-            ➕ Nuevo Beneficiario
+            <Icon name="plus" size={16} /> Nuevo Beneficiario
           </button>
           <button
             className="btn-secondary"
@@ -370,9 +371,9 @@ export const BeneficiaryManagementPage = () => {
                     <td>#{beneficiary.id}</td>
                     <td>{beneficiary.beneficiaryName || beneficiary.name}</td>
                     <td>
-                      {beneficiary.type === 'SCHOOL' && '🏫 Colegio'}
-                      {beneficiary.type === 'SHELTER' && '🏠 Albergue'}
-                      {beneficiary.type === 'NGO' && '🤝 ONG'}
+                      {beneficiary.type === 'SCHOOL' && <><Icon name="school" size={16} /> Colegio</>}
+                      {beneficiary.type === 'SHELTER' && <><Icon name="home" size={16} /> Albergue</>}
+                      {beneficiary.type === 'NGO' && <><Icon name="handshake" size={16} /> ONG</>}
                     </td>
                     <td>{beneficiary.address}</td>
                     <td>

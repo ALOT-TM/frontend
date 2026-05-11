@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../shared/hooks/useAuth';
+import Icon from '../../../shared/components/Icon';
 import './BeneficiaryLayout.css';
 
 export const BeneficiaryLayout = ({ children }) => {
@@ -16,10 +17,10 @@ export const BeneficiaryLayout = ({ children }) => {
     <div className="beneficiary-layout">
       <header className="beneficiary-header">
         <div className="header-left">
-          <h1>🎁 Portal de Donaciones</h1>
+          <h1><Icon name="gift" size={28} /> Portal de Donaciones</h1>
         </div>
         <div className="header-right">
-          <span className="user-info">👤 {user?.email}</span>
+          <span className="user-info"><Icon name="user" size={16} /> {user?.email}</span>
           <button className="logout-btn" onClick={handleLogout}>
             Cerrar Sesión
           </button>
@@ -30,7 +31,7 @@ export const BeneficiaryLayout = ({ children }) => {
         <ul>
           <li>
             <a href="/beneficiary/donations">
-              🎁 Mis Donaciones
+              <Icon name="gift" size={16} /> Mis Donaciones
             </a>
           </li>
         </ul>

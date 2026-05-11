@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../shared/hooks/useAuth';
+import Icon from '../../../shared/components/Icon';
 import './ManagerLayout.css';
 
 export const ManagerLayout = ({ children }) => {
@@ -16,10 +17,10 @@ export const ManagerLayout = ({ children }) => {
     <div className="manager-layout">
       <header className="manager-header">
         <div className="header-left">
-          <h1>🏪 Fluxus - Gestión de Merma</h1>
+          <h1><Icon name="store" size={28} /> Fluxus - Gestión de Merma</h1>
         </div>
         <div className="header-right">
-          <span className="user-info">👤 {user?.email}</span>
+          <span className="user-info"><Icon name="user" size={16} /> {user?.email}</span>
           <button className="logout-btn" onClick={handleLogout}>
             Cerrar Sesión
           </button>
@@ -30,22 +31,22 @@ export const ManagerLayout = ({ children }) => {
         <ul>
           <li>
             <a href="/manager/dashboard" className={location.pathname === '/manager/dashboard' ? 'active' : ''}>
-              📊 Dashboard
+              <Icon name="chart" size={16} /> Dashboard
             </a>
           </li>
           <li>
             <a href="/manager/merma" className={location.pathname === '/manager/merma' ? 'active' : ''}>
-              📦 Gestión de Merma
+              <Icon name="package" size={16} /> Gestión de Merma
             </a>
           </li>
           <li>
             <a href="/manager/beneficiaries" className={location.pathname === '/manager/beneficiaries' ? 'active' : ''}>
-              🏫 Beneficiarios
+              <Icon name="school" size={16} /> Beneficiarios
             </a>
           </li>
           <li>
             <a href="/manager/donations" className={location.pathname === '/manager/donations' ? 'active' : ''}>
-              🎁 Donaciones
+              <Icon name="gift" size={16} /> Donaciones
             </a>
           </li>
         </ul>

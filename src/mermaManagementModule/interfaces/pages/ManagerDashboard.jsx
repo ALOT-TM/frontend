@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import MermaQueryService from '../../application/MermaQueryService';
 import DonationQueryService from '../../../donationsManagementModule/application/DonationQueryService';
 import BeneficiaryQueryService from '../../../beneficiariesManagementModule/application/BeneficiaryQueryService';
+import Icon from '../../../shared/components/Icon';
 import './Dashboard.css';
 
 export const ManagerDashboard = () => {
@@ -52,7 +53,7 @@ export const ManagerDashboard = () => {
 
       <div className="stats-grid">
         <div className="stat-card">
-          <div className="stat-icon">📦</div>
+          <div className="stat-icon"><Icon name="package" size={40} /></div>
           <div className="stat-content">
             <h3>Total de Merma</h3>
             <p className="stat-number">{stats.totalMerma}</p>
@@ -61,7 +62,7 @@ export const ManagerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon"><Icon name="check" size={40} /></div>
           <div className="stat-content">
             <h3>Merma Donable</h3>
             <p className="stat-number">{stats.donableMerma}</p>
@@ -70,7 +71,7 @@ export const ManagerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">🎁</div>
+          <div className="stat-icon"><Icon name="gift" size={40} /></div>
           <div className="stat-content">
             <h3>Donaciones Activas</h3>
             <p className="stat-number">{stats.activeDonations}</p>
@@ -79,7 +80,7 @@ export const ManagerDashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">🏫</div>
+          <div className="stat-icon"><Icon name="school" size={40} /></div>
           <div className="stat-content">
             <h3>Beneficiarios Activos</h3>
             <p className="stat-number">{stats.activeBeneficiaries}</p>
@@ -92,13 +93,13 @@ export const ManagerDashboard = () => {
         <h3>Acciones Rápidas</h3>
         <div className="actions-grid">
           <a href="/manager/merma" className="action-btn action-btn-primary">
-            📝 Registrar Merma
+            <Icon name="memo" size={18} /> Registrar Merma
           </a>
           <a href="/manager/beneficiaries" className="action-btn action-btn-secondary">
-            🏫 Ver Beneficiarios
+            <Icon name="school" size={18} /> Ver Beneficiarios
           </a>
           <a href="/manager/donations" className="action-btn action-btn-tertiary">
-            🎁 Crear Donación
+            <Icon name="gift" size={18} /> Crear Donación
           </a>
         </div>
       </div>
