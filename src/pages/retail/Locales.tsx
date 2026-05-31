@@ -119,7 +119,7 @@ export const Locales = () => {
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentLocal, setCurrentLocal] = useState<Local | null>(null);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [_deleteId, setDeleteId] = useState<number | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);
   const [retailCompanyId, setRetailCompanyId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,7 +164,7 @@ export const Locales = () => {
     show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
-  const cardVariants = {
+  const cardVariants: any = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
   };

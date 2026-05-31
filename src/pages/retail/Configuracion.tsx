@@ -6,38 +6,89 @@ import {
   Eye, 
   EyeOff, 
   Loader2, 
-  ImagePlus, 
   UserCircle,
   CreditCard,
   CheckCircle2
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
+import { api } from "../../services/api";
 
 export const Configuracion = () => {
   const [activeTab, setActiveTab] = useState<"usuario" | "empresa" | "seguridad" | "suscripcion">("usuario");
 
   // --- Perfil de Usuario State ---
-  const [username, setUsername] = useState("retailadmin");
-  const [userRecoveryEmail, setUserRecoveryEmail] = useState("juan.recuperacion@gmail.com");
+  const [username, setUsername] = useState("");
+  const [userRecoveryEmail, setUserRecoveryEmail] = useState("");
+  const [initialUsername, setInitialUsername] = useState("");
+  const [initialEmail, setInitialEmail] = useState("");
   const [isSavingUser, setIsSavingUser] = useState(false);
   const [hasUserChanges, setHasUserChanges] = useState(false);
 
+  const parseJwtUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      return payload.userId || payload.sub || null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const userId = parseJwtUserId();
+        if (userId) {
+          const userResponse = await api.get(`/auth/users/${userId}`);
+          const fetchedUsername = userResponse.data?.username || "";
+          const fetchedEmail = userResponse.data?.email || "";
+          setUsername(fetchedUsername);
+          setUserRecoveryEmail(fetchedEmail);
+          setInitialUsername(fetchedUsername);
+          setInitialEmail(fetchedEmail);
+
+          const companyId = userResponse.data?.retailCompanyId;
+          if (companyId) {
+            const companyResponse = await api.get(`/retail-companies/${companyId}`);
+            setCompanyName(companyResponse.data?.name || "Retail Company");
+          }
+        }
+      } catch (err) {
+        console.error("Error loading user profile", err);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     setHasUserChanges(
-      username !== "retailadmin" || 
-      userRecoveryEmail !== "juan.recuperacion@gmail.com"
+      username !== initialUsername || 
+      userRecoveryEmail !== initialEmail
     );
-  }, [username, userRecoveryEmail]);
+  }, [username, userRecoveryEmail, initialUsername, initialEmail]);
 
-  const handleSaveUser = (e: React.FormEvent) => {
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingUser(true);
-    setTimeout(() => {
-      setIsSavingUser(false);
-      setHasUserChanges(false);
+    try {
+      const response = await api.put("/auth/profile", {
+        username,
+        email: userRecoveryEmail
+      });
+      const updatedUser = response.data;
+      setUsername(updatedUser.username);
+      setUserRecoveryEmail(updatedUser.email);
+      setInitialUsername(updatedUser.username);
+      setInitialEmail(updatedUser.email);
       toast.success("Perfil de usuario actualizado");
-    }, 1000);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar perfil");
+    } finally {
+      setIsSavingUser(false);
+    }
   };
 
   // --- Configuración de Empresa State ---
@@ -48,10 +99,10 @@ export const Configuracion = () => {
 
   useEffect(() => {
     setHasCompanyChanges(
-      companyName !== "Retail Solutions S.A." || 
-      companyPhone !== "+1 234 567 8900"
+      companyName !== "Retail Solutions S.A." && 
+      companyName !== ""
     );
-  }, [companyName, companyPhone]);
+  }, [companyName]);
 
   const handleSaveCompany = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,20 +123,27 @@ export const Configuracion = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-  const handleUpdatePassword = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
       toast.error("Las contraseñas no coinciden");
       return;
     }
     setIsSavingPassword(true);
-    setTimeout(() => {
-      setIsSavingPassword(false);
+    try {
+      await api.put("/auth/change-password", {
+        currentPassword,
+        newPassword
+      });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       toast.success("Contraseña actualizada correctamente");
-    }, 1200);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar contraseña");
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
 

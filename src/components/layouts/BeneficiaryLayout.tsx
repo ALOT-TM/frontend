@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Outlet, NavLink, useNavigate, useOutletContext } from "react-router-dom";
 import { Search, ListChecks, Settings, ClipboardList, LogOut, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import logoUrl from "../../assets/fluxuspng.png";
+import { api } from "../../services/api";
 
 // Interfaces for Cart
 export interface CartItem {
@@ -53,12 +54,24 @@ export const BeneficiaryLayout = () => {
     setCart([]);
   };
 
-  const confirmRequest = () => {
+  const confirmRequest = async () => {
     if (cart.length === 0) return;
-    toast.success("¡Solicitud de donación enviada con éxito!");
-    clearCart();
-    setIsCartOpen(false);
-    navigate("/beneficiary/seguimientos");
+    try {
+      await Promise.all(
+        cart.map((item) =>
+          api.post("/requests", {
+            mermaId: item.id,
+            notes: "Solicitado desde el catálogo de beneficiario"
+          })
+        )
+      );
+      toast.success("¡Solicitud de donación enviada con éxito!");
+      clearCart();
+      setIsCartOpen(false);
+      navigate("/beneficiary/seguimientos");
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al enviar la solicitud");
+    }
   };
 
   // Agrupar items por local
@@ -139,6 +152,13 @@ export const BeneficiaryLayout = () => {
                 <span className="text-sm font-bold text-slate-900 leading-tight">Fundación Ayuda Sur</span>
                 <span className="text-xs text-slate-500">contacto@fundacionayudasur.org</span>
               </div>
+              <button
+                onClick={handleLogout}
+                className="p-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors focus:outline-none"
+                title="Cerrar Sesión"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>

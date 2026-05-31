@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, Search, ChevronLeft, ChevronRight, 
-  MoreVertical, Edit2, Trash2, CheckCircle2, XCircle, AlertTriangle, X, ChevronDown
+  CheckCircle2, XCircle, AlertTriangle, X, ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
@@ -25,6 +25,7 @@ interface MermaItem {
   headquarterId?: number | null;
   headquarterName?: string;
   registerDate?: string;
+  shrinkageValue?: number;
 }
 
 interface MermaFormData {
@@ -35,6 +36,7 @@ interface MermaFormData {
   customReason: string;
   categoryId: number | "";
   headquarterId: number | "";
+  shrinkageValue: number | "";
 }
 
 interface CategoryOption {
@@ -63,6 +65,7 @@ interface ShrinkageDto {
   retailCompanyHeadquarter?: HeadquarterOption;
   specificReason?: string | null;
   createdAt?: string;
+  shrinkageValue?: number;
 }
 
 const StatusBadge = ({ status }: { status: MermaStatus }) => {
@@ -182,14 +185,11 @@ export const GestionMerma = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MermaItem | null>(null);
-  const [actionItemId, setActionItemId] = useState<number | null>(null);
-  const [dropdownOpenId, setDropdownOpenId] = useState<number | null>(null);
   
   // Custom Selects State
   const [isFilterStatusOpen, setIsFilterStatusOpen] = useState(false);
   const filterStatusRef = useRef<HTMLDivElement>(null);
-  const [isFormStatusOpen, setIsFormStatusOpen] = useState(false);
-  const formStatusRef = useRef<HTMLDivElement>(null);
+
   const [isReasonOpen, setIsReasonOpen] = useState(false);
   const reasonRef = useRef<HTMLDivElement>(null);
 
@@ -232,6 +232,7 @@ export const GestionMerma = () => {
       headquarterId: shrinkage.retailCompanyHeadquarter?.retailCompanyHeadquarterId || null,
       headquarterName: shrinkage.retailCompanyHeadquarter?.description || "-",
       registerDate: formatDateDash(shrinkage.createdAt),
+      shrinkageValue: shrinkage.shrinkageValue || 0,
     };
   };
 
@@ -245,9 +246,6 @@ export const GestionMerma = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (filterStatusRef.current && !filterStatusRef.current.contains(event.target as Node)) {
         setIsFilterStatusOpen(false);
-      }
-      if (formStatusRef.current && !formStatusRef.current.contains(event.target as Node)) {
-        setIsFormStatusOpen(false);
       }
       if (reasonRef.current && !reasonRef.current.contains(event.target as Node)) {
         setIsReasonOpen(false);
@@ -266,6 +264,7 @@ export const GestionMerma = () => {
     reasonId: "",
     categoryId: "",
     headquarterId: "",
+    shrinkageValue: "",
   });
 
   useEffect(() => {
@@ -324,6 +323,7 @@ export const GestionMerma = () => {
         customReason: item.customReason || "",
         categoryId: item.categoryId || "",
         headquarterId: item.headquarterId || "",
+        shrinkageValue: item.shrinkageValue ?? "",
       });
     } else {
       setEditingItem(null);
@@ -335,9 +335,9 @@ export const GestionMerma = () => {
         reasonId: "",
         categoryId: "",
         headquarterId: "",
+        shrinkageValue: "",
       });
     }
-    setDropdownOpenId(null);
     setIsModalOpen(true);
   };
 
@@ -359,6 +359,10 @@ export const GestionMerma = () => {
       toast.error("Selecciona una razón", { description: "Por favor, especifica por qué se está enviando este producto a merma.", id: "merma-reason" });
       return;
     }
+    if (formData.shrinkageValue === "" || formData.shrinkageValue < 0) {
+      toast.error("Valor unitario no válido", { description: "Por favor, ingresa un valor unitario no negativo.", id: "merma-value" });
+      return;
+    }
     const selectedReason = reasons.find((reason) => reason.shrinkageReasonId === formData.reasonId);
     if (selectedReason?.name === "Otro" && !formData.customReason.trim()) {
       toast.error("Especifica la razón", { description: "Por favor, escribe la razón específica de la merma.", id: "merma-reason" });
@@ -374,6 +378,7 @@ export const GestionMerma = () => {
         expirationDate: formData.expiryDate || null,
         specificReason: selectedReason?.name === "Otro" ? formData.customReason.trim() : null,
         pickupDate: null,
+        shrinkageValue: Number(formData.shrinkageValue),
       };
       await api.post("/shrinkages", payload);
       await reloadItems();
@@ -384,28 +389,20 @@ export const GestionMerma = () => {
     }
   };
 
-  const confirmDelete = (id: number) => {
-    setActionItemId(id);
-    setDropdownOpenId(null);
-    setIsDeleteModalOpen(true);
-  };
-
-  const handleDelete = () => {
-    toast.error("Eliminación no disponible", { description: "Aún no existe un endpoint para eliminar mermas." });
-    setIsDeleteModalOpen(false);
-    setActionItemId(null);
-  };
-
   const quickChangeStatus = async (id: number, newStatus: MermaStatus) => {
     try {
       const statusEndpoint = newStatus === "Donable" ? "donable" : "not-donable";
       await api.patch(`/shrinkages/${id}/${statusEndpoint}`);
       await reloadItems();
-      setDropdownOpenId(null);
       toast.success(`Estado actualizado a ${newStatus}.`);
     } catch {
       toast.error("No se pudo actualizar el estado.");
     }
+  };
+
+  const handleDelete = () => {
+    toast.error("Eliminación no disponible");
+    setIsDeleteModalOpen(false);
   };
 
   return (
@@ -503,6 +500,7 @@ export const GestionMerma = () => {
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Producto</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Categoría</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Cant.</th>
+                <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Val. Unit.</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Local</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Fecha Registro</th>
                 <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Vencimiento</th>
@@ -539,6 +537,7 @@ export const GestionMerma = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">{item.category}</td>
                     <td className="px-6 py-4 text-sm font-medium text-slate-700">{item.quantity} und</td>
+                    <td className="px-6 py-4 text-sm text-slate-600">S/. {(item.shrinkageValue ?? 0).toFixed(2)}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{item.headquarterName || "-"}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{item.registerDate || "-"}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">{item.expiryDate || "-"}</td>
@@ -691,6 +690,20 @@ export const GestionMerma = () => {
                         min="1"
                         value={formData.quantity}
                         onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium text-slate-700">Valor Unitario (S/.)</label>
+                      <input
+                        required
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={formData.shrinkageValue}
+                        onChange={(e) => setFormData({ ...formData, shrinkageValue: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                       />
                     </div>

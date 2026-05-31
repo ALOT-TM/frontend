@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, ArrowRight, History, Package, Archive, CheckCircle, AlertCircle, ArrowDownUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Search, ArrowRight, History, Package, Archive, CheckCircle, AlertCircle, ArrowDownUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 
-type MermaStatus = "Pendiente" | "Donable" | "No Donable" | "Solicitado" | "Procesando" | "Donado";
+type MermaStatus = "Pendiente" | "Donable" | "No Donable" | "Solicitado" | "Procesando" | "Donado" | "Por evaluar";
 
 interface AuditEvent {
   id: string;
@@ -26,6 +26,7 @@ const statusColors: Record<MermaStatus, string> = {
   "Solicitado": "bg-amber-50 text-amber-700 border-amber-200",
   "Procesando": "bg-blue-50 text-blue-700 border-blue-200",
   "Donado": "bg-purple-50 text-purple-700 border-purple-200",
+  "Por evaluar": "bg-sky-50 text-sky-700 border-sky-200",
 };
 
 interface StatusChangeLogDto {
@@ -60,10 +61,19 @@ export const Historial = () => {
     const loadHistory = async () => {
       setIsLoading(true);
       try {
-        const logsResponse = await api.get("/audit/status-changes", {
-          params: { entityType: "SHRINKAGE" },
-        });
+        const [logsResponse, requestsResponse] = await Promise.all([
+          api.get("/audit/status-changes", { params: { entityType: "SHRINKAGE" } }),
+          api.get("/requests/company")
+        ]);
         const logs = (logsResponse.data || []) as StatusChangeLogDto[];
+        const requests = requestsResponse.data || [];
+        const pendingShrinkageIds = new Set<number>(
+          requests
+            .filter((req: any) => req.status === "PENDING")
+            .map((req: any) => req.shrinkageReferenceId?.value)
+            .filter(Boolean)
+        );
+
         const shrinkageIds = Array.from(new Set(logs.map((log) => log.entityId)));
         const userIds = Array.from(
           new Set(logs.map((log) => log.changedByUserId).filter((id): id is number => Boolean(id)))
@@ -85,7 +95,7 @@ export const Historial = () => {
         const userMap = new Map<number, UserDto>();
         userResults.forEach((item) => userMap.set(item.id, item.data));
 
-        setEvents(logs.map((log) => mapLogToEvent(log, shrinkageMap, userMap)));
+        setEvents(logs.map((log) => mapLogToEvent(log, shrinkageMap, userMap, pendingShrinkageIds)));
       } catch {
         setEvents([]);
       } finally {
@@ -138,6 +148,8 @@ export const Historial = () => {
         return CheckCircle;
       case "No Donable":
         return AlertCircle;
+      case "Por evaluar":
+        return AlertCircle;
       default:
         return History;
     }
@@ -146,12 +158,19 @@ export const Historial = () => {
   const mapLogToEvent = (
     log: StatusChangeLogDto,
     shrinkageMap: Map<number, ShrinkageDto>,
-    userMap: Map<number, UserDto>
+    userMap: Map<number, UserDto>,
+    pendingShrinkageIds: Set<number>
   ): AuditEvent => {
     const shrinkage = shrinkageMap.get(log.entityId);
     const user = log.changedByUserId ? userMap.get(log.changedByUserId) : null;
-    const oldStatus = mapStatus(log.fromStatus);
-    const newStatus = mapStatus(log.toStatus);
+    let oldStatus = mapStatus(log.fromStatus);
+    let newStatus = mapStatus(log.toStatus);
+    if (oldStatus === "Pendiente" && pendingShrinkageIds.has(log.entityId)) {
+      oldStatus = "Por evaluar";
+    }
+    if (newStatus === "Pendiente" && pendingShrinkageIds.has(log.entityId)) {
+      newStatus = "Por evaluar";
+    }
     return {
       id: String(log.id),
       productName: shrinkage?.name || `Merma #${log.entityId}`,

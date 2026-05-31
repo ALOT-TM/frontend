@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -7,11 +7,8 @@ import {
   HeartHandshake,
   Store,
   Users,
-  ShieldCheck,
   History,
   Settings,
-  Bell,
-  Search,
   Menu,
   X,
   UserCircle,
