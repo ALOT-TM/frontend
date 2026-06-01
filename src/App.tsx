@@ -18,6 +18,7 @@ import { BuscarDonaciones } from "./pages/beneficiary/BuscarDonaciones";
 import { MisSeguimientos } from "./pages/beneficiary/MisSeguimientos";
 import { ConfiguracionBeneficiario } from "./pages/beneficiary/ConfiguracionBeneficiario";
 import { Toaster } from "sonner";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 function App() {
   return (
@@ -36,24 +37,28 @@ function App() {
         </Route>
         
         {/* Rutas Privadas Retail */}
-        <Route path="/retail" element={<RetailLayout />}>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          {/* Rutas placeholder */}
-          <Route path="gestion-merma" element={<GestionMerma />} />
-          <Route path="donaciones" element={<Donaciones />} />
-          <Route path="locales" element={<Locales />} />
-          <Route path="accesos" element={<Accesos />} />
-          <Route path="historial" element={<Historial />} />
-          <Route path="configuracion" element={<Configuracion />} />
+        <Route element={<ProtectedRoute allowedRoles={["RETAIL"]} />}>
+          <Route path="/retail" element={<RetailLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            {/* Rutas placeholder */}
+            <Route path="gestion-merma" element={<GestionMerma />} />
+            <Route path="donaciones" element={<Donaciones />} />
+            <Route path="locales" element={<Locales />} />
+            <Route path="accesos" element={<Accesos />} />
+            <Route path="historial" element={<Historial />} />
+            <Route path="configuracion" element={<Configuracion />} />
+          </Route>
         </Route>
 
         {/* Rutas Privadas Beneficiario */}
-        <Route path="/beneficiary" element={<BeneficiaryLayout />}>
-          <Route index element={<Navigate to="buscar" replace />} />
-          <Route path="buscar" element={<BuscarDonaciones />} />
-          <Route path="seguimientos" element={<MisSeguimientos />} />
-          <Route path="configuracion" element={<ConfiguracionBeneficiario />} />
+        <Route element={<ProtectedRoute allowedRoles={["BENEFICIARY"]} />}>
+          <Route path="/beneficiary" element={<BeneficiaryLayout />}>
+            <Route index element={<Navigate to="buscar" replace />} />
+            <Route path="buscar" element={<BuscarDonaciones />} />
+            <Route path="seguimientos" element={<MisSeguimientos />} />
+            <Route path="configuracion" element={<ConfiguracionBeneficiario />} />
+          </Route>
         </Route>
 
         {/* Fallback route */}

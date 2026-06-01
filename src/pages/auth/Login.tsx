@@ -5,6 +5,7 @@ import { api } from "../../services/api";
 import { isAxiosError } from "axios";
 import { cn } from "../../utils/cn";
 import logoUrl from "../../assets/fluxusmini.png";
+import { decodeToken } from "../../components/auth/ProtectedRoute";
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -25,7 +26,13 @@ export const Login = () => {
         throw new Error("Token missing");
       }
       localStorage.setItem("token", token);
-      navigate("/retail/dashboard");
+
+      const payload = decodeToken(token);
+      if (payload && payload.actor === "BENEFICIARY") {
+        navigate("/beneficiary/buscar");
+      } else {
+        navigate("/retail/dashboard");
+      }
     } catch (error) {
       if (isAxiosError(error) && error.response) {
         const status = error.response.status;
