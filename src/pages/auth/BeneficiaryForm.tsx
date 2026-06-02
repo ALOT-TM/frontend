@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Building, Mail, MapPin, User, Lock, ChevronDown, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "../../services/api";
+import { isAxiosError } from "axios";
 
 interface Option {
   value: string;
@@ -24,7 +25,7 @@ const CustomSelect = ({
   placeholder: string; 
   icon?: any;
 }) => {
-  const [isOpen, setIsOpen] = React.useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   
   return (
     <div className="relative">

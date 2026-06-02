@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   HeartHandshake, Inbox, Search, Star, Building2, ChevronRight, ChevronLeft, ArrowLeft, 
-  PackageCheck, AlertTriangle, X, CheckCircle2, ChevronDown, ChevronUp, CheckSquare, Square, ClipboardList, Clock, Truck
+  PackageCheck, CheckCircle2, ChevronDown, ChevronUp, CheckSquare, Square, ClipboardList, Clock, Truck
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
@@ -26,6 +25,7 @@ interface RequestedItem {
   id: string;
   product: string;
   requestedQty: number;
+  shrinkageId?: number;
 }
 
 interface Peticion {
@@ -44,7 +44,7 @@ interface DonationRecord {
   deliveryDate: string;
 }
 
-const mockInstitutions: Institution[] = [
+export const mockInstitutions: Institution[] = [
   { id: "1", name: "Comedor Popular Esperanza", type: "Comedor Social", isFavorite: true },
   { id: "2", name: "ONG Alimentos para Todos", type: "Organización No Gubernamental", isFavorite: false },
   { id: "3", name: "Hogar de Niños San José", type: "Orfanato", isFavorite: true },
@@ -53,7 +53,7 @@ const mockInstitutions: Institution[] = [
   { id: "6", name: "Refugio Animales San Francisco", type: "Refugio Animal", isFavorite: false },
 ];
 
-const mockMermaDonable: MermaItem[] = [
+export const mockMermaDonable: MermaItem[] = [
   { id: "m1", product: "Lote de Manzanas", maxStock: 45 },
   { id: "m2", product: "Cajas de Leche Evaporada", maxStock: 20 },
   { id: "m3", product: "Panadería Variada", maxStock: 150 },
@@ -61,7 +61,7 @@ const mockMermaDonable: MermaItem[] = [
   { id: "m5", product: "Vegetales Mixtos (Sacos)", maxStock: 12 },
 ];
 
-const mockPeticiones: Peticion[] = [
+export const mockPeticiones: Peticion[] = [
   {
     id: "p1",
     institutionName: "Comedor Popular Esperanza",
@@ -82,23 +82,28 @@ const mockPeticiones: Peticion[] = [
   }
 ];
 
-const mockDonationRecords: DonationRecord[] = [
+export const mockDonationRecords: DonationRecord[] = [
   { id: "dr1", product: "Cajas de Leche Evaporada", institutionName: "Comedor Popular Esperanza", qty: 5, status: "Procesando", deliveryDate: "-" },
   { id: "dr2", product: "Lote de Manzanas", institutionName: "Hogar de Niños San José", qty: 10, status: "Donado", deliveryDate: "2026-05-28" },
   { id: "dr3", product: "Panadería Variada", institutionName: "Banco de Alimentos Lima", qty: 30, status: "Procesando", deliveryDate: "-" },
   { id: "dr4", product: "Vegetales Mixtos (Sacos)", institutionName: "ONG Alimentos para Todos", qty: 12, status: "Donado", deliveryDate: "2026-05-25" },
 ];
 
+import { useRef } from "react";
+import { api } from "../../services/api";
+
 export const Donaciones = () => {
   const [activeTab, setActiveTab] = useState<"crear" | "peticiones" | "registro">("crear");
 
   // --- Estado Tab 1: Crear Donación ---
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [institutions, setInstitutions] = useState<Institution[]>(mockInstitutions);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [mermas, setMermas] = useState<MermaItem[]>([]);
   const [instSearch, setInstSearch] = useState("");
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [selectedInst, setSelectedInst] = useState<Institution | null>(null);
   const [mermaSearch, setMermaSearch] = useState("");
+  const [_isSubmitting, setIsSubmitting] = useState(false);
   
   // --- Paginación Merma (Paso 2) ---
   const [mermaCurrentPage, setMermaCurrentPage] = useState(1);
@@ -113,16 +118,231 @@ export const Donaciones = () => {
   const [donationMessage, setDonationMessage] = useState("");
 
   // --- Estado Tab 2: Peticiones ---
-  const [peticiones, setPeticiones] = useState<Peticion[]>(mockPeticiones);
+  const [peticiones, setPeticiones] = useState<Peticion[]>([]);
   const [expandedPeticionId, setExpandedPeticionId] = useState<string | null>(null);
   // Estado para la aprobación parcial (peticionId -> array of requestedItemId)
   const [selectedForApproval, setSelectedForApproval] = useState<Record<string, string[]>>({});
-  
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [confirmPeticionId, setConfirmPeticionId] = useState<string | null>(null);
-  
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectPeticionId, setRejectPeticionId] = useState<string | null>(null);
+  const [submittingRequestId, setSubmittingRequestId] = useState<string | null>(null);
+
+  // --- Estado Tab 3: Registro ---
+  const [donationRecords, setDonationRecords] = useState<DonationRecord[]>([]);
+
+  // --- APIs Data Loaders ---
+  const reloadMerma = async () => {
+    try {
+      const response = await api.get("/shrinkages/donable");
+      const shrinkages = (response.data || []) as any[];
+      setMermas(
+        shrinkages.map((s) => ({
+          id: String(s.shrinkageId),
+          product: s.name,
+          maxStock: s.quantity,
+        }))
+      );
+    } catch {
+      setMermas([]);
+    }
+  };
+
+  const reloadInstitutions = async () => {
+    try {
+      const response = await api.get("/beneficiary-institutions");
+      const list = response.data || [];
+      setInstitutions(
+        list.map((bi: any) => ({
+          id: String(bi.beneficiaryInstitutionId),
+          name: bi.name,
+          type: bi.institutionType?.name || "Sin tipo",
+          isFavorite: false,
+        }))
+      );
+    } catch {
+      setInstitutions([]);
+    }
+  };
+
+  const loadPeticiones = async () => {
+    try {
+      const response = await api.get("/requests/company");
+      const requests = response.data || [];
+      const pendingRequests = requests.filter((req: any) => req.status === "PENDING");
+      
+      const resolved = await Promise.all(pendingRequests.map(async (req: any) => {
+        const benId = req.beneficiaryReferenceId?.value;
+        const shrId = req.shrinkageReferenceId?.value;
+        
+        let institutionName = `Beneficiario #${benId}`;
+        try {
+          const benRes = await api.get(`/beneficiary-institutions/${benId}`);
+          if (benRes.data?.name) {
+            institutionName = benRes.data.name;
+          }
+        } catch {}
+        
+        let product = `Merma #${shrId}`;
+        let maxQty = 1;
+        try {
+          const shrRes = await api.get(`/shrinkages/${shrId}`);
+          if (shrRes.data?.name) {
+            product = shrRes.data.name;
+            maxQty = shrRes.data.quantity;
+          }
+        } catch {}
+        
+        return {
+          id: String(req.id || req.donationRequestId?.value),
+          institutionName,
+          date: req.createdAt ? new Date(req.createdAt).toLocaleString() : "Recientemente",
+          items: [
+            {
+              id: String(req.id || req.donationRequestId?.value),
+              product,
+              requestedQty: maxQty,
+              shrinkageId: shrId,
+            }
+          ]
+        };
+      }));
+
+      // Group resolved items by institutionName
+      const groups: Record<string, Peticion> = {};
+      resolved.forEach((item) => {
+        const key = item.institutionName;
+        if (!groups[key]) {
+          groups[key] = {
+            id: item.id,
+            institutionName: item.institutionName,
+            date: item.date,
+            items: [],
+          };
+        }
+        groups[key].items.push({
+          id: item.items[0].id,
+          product: item.items[0].product,
+          requestedQty: item.items[0].requestedQty,
+          shrinkageId: item.items[0].shrinkageId,
+        });
+      });
+      
+      setPeticiones(Object.values(groups));
+    } catch {
+      setPeticiones([]);
+    }
+  };
+
+  const reloadDonations = async () => {
+    try {
+      const response = await api.get("/donations/company");
+      const donations = response.data || [];
+      
+      const resolved = await Promise.all(donations.map(async (d: any) => {
+        const shrId = d.items?.[0]?.shrinkageReferenceId?.value || d.shrinkageReferenceId?.value;
+        const benId = d.beneficiaryReferenceId?.value;
+        
+        let institutionName = `Beneficiario #${benId}`;
+        try {
+          const benRes = await api.get(`/beneficiary-institutions/${benId}`);
+          if (benRes.data?.name) {
+            institutionName = benRes.data.name;
+          }
+        } catch {}
+        
+        let product = `Merma #${shrId}`;
+        try {
+          const shrRes = await api.get(`/shrinkages/${shrId}`);
+          if (shrRes.data?.name) {
+            product = shrRes.data.name;
+          }
+        } catch {}
+        
+        return {
+          id: String(d.donationId?.value || d.id),
+          product,
+          institutionName,
+          qty: d.quantity?.amount || 0,
+          status: d.status === "CONFIRMED" || d.status === "DONATED" ? "Donado" : "Procesando",
+          deliveryDate: d.scheduledDeliveryDate?.value || "-",
+        };
+      }));
+      
+      setDonationRecords(resolved);
+    } catch {
+      setDonationRecords([]);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      await Promise.all([reloadInstitutions(), reloadMerma(), loadPeticiones(), reloadDonations()]);
+    };
+    init();
+  }, []);
+
+  // Cleanup reserved items on unmount
+  const donationQuantitiesRef = useRef(donationQuantities);
+  useEffect(() => {
+    donationQuantitiesRef.current = donationQuantities;
+  }, [donationQuantities]);
+
+  useEffect(() => {
+    return () => {
+      const current = donationQuantitiesRef.current;
+      const reservedIds = Object.keys(current).filter(id => current[id] > 0);
+      if (reservedIds.length > 0) {
+        reservedIds.forEach(id => {
+          const url = `${import.meta.env.VITE_API_URL}/shrinkages/${id}/donable`;
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(url);
+          } else {
+            fetch(url, { method: "PATCH", keepalive: true });
+          }
+        });
+      }
+    };
+  }, []);
+
+  const releaseAllReserved = async (currentQuantities: Record<string, number> = donationQuantities) => {
+    const reservedIds = Object.keys(currentQuantities).filter(id => currentQuantities[id] > 0);
+    if (reservedIds.length === 0) return;
+    try {
+      await Promise.all(
+        reservedIds.map(id => api.patch(`/shrinkages/${id}/donable`))
+      );
+      setDonationQuantities({});
+      await reloadMerma();
+      toast.info("Reservas de productos liberadas.");
+    } catch {
+      toast.error("Error al liberar las reservas.");
+    }
+  };
+
+  const handleToggleProduct = async (item: MermaItem) => {
+    const qty = donationQuantities[item.id] || 0;
+    try {
+      if (qty === 0) {
+        // Reserve
+        await api.patch(`/shrinkages/${item.id}/in-process`);
+        setDonationQuantities(prev => ({ ...prev, [item.id]: item.maxStock }));
+        toast.success(`${item.product} reservado temporalmente.`);
+      } else {
+        // Release
+        await api.patch(`/shrinkages/${item.id}/donable`);
+        setDonationQuantities(prev => ({ ...prev, [item.id]: 0 }));
+        toast.info(`${item.product} liberado.`);
+      }
+      await reloadMerma();
+    } catch {
+      toast.error("No se pudo actualizar la reserva del producto.");
+    }
+  };
+
+  const handleTabChange = async (tab: "crear" | "peticiones" | "registro") => {
+    if (activeTab === "crear" && step >= 2) {
+      await releaseAllReserved();
+    }
+    setActiveTab(tab);
+    setStep(1);
+  };
 
   // --- Handlers Tab 1 ---
   const toggleFavorite = (id: string) => {
@@ -149,8 +369,8 @@ export const Donaciones = () => {
   }, [instSearch, showOnlyFavorites]);
 
   const filteredMerma = useMemo(() => {
-    return mockMermaDonable.filter(m => m.product.toLowerCase().includes(mermaSearch.toLowerCase()));
-  }, [mermaSearch]);
+    return mermas.filter(m => m.product.toLowerCase().includes(mermaSearch.toLowerCase()));
+  }, [mermas, mermaSearch]);
 
   const totalMermaPages = Math.ceil(filteredMerma.length / mermaPerPage);
   
@@ -171,11 +391,6 @@ export const Donaciones = () => {
     setStep(2);
   };
 
-  const handleSetQuantity = (id: string, qty: number, max: number) => {
-    const validQty = Math.max(0, Math.min(qty, max));
-    setDonationQuantities(prev => ({ ...prev, [id]: validQty }));
-  };
-
   const handleGoToStep3 = () => {
     const totalItems = Object.values(donationQuantities).filter(q => q > 0).length;
     if (totalItems === 0) {
@@ -185,10 +400,33 @@ export const Donaciones = () => {
     setStep(3);
   };
 
-  const handleSubmitDonation = () => {
-    toast.success(`Donación ofrecida a ${selectedInst?.name} con éxito.`);
-    setStep(1);
-    setSelectedInst(null);
+  const handleSubmitDonation = async () => {
+    const selectedIds = Object.keys(donationQuantities).filter(id => donationQuantities[id] > 0);
+    if (selectedIds.length === 0) return;
+    setIsSubmitting(true);
+    try {
+      await Promise.all(
+        selectedIds.map(id => {
+          const payload = {
+            shrinkageReferenceId: { value: Number(id) },
+            beneficiaryReferenceId: { value: Number(selectedInst?.id) },
+            quantity: { amount: donationQuantities[id] },
+            scheduledDeliveryDate: { value: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10) }
+          };
+          return api.post("/donations/create", payload);
+        })
+      );
+      toast.success(`Donación ofrecida a ${selectedInst?.name} con éxito.`);
+      setDonationQuantities({});
+      setSelectedInst(null);
+      setStep(1);
+      await reloadMerma();
+      await reloadDonations();
+    } catch {
+      toast.error("No se pudo registrar la donación.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // --- Handlers Tab 2 ---
@@ -219,40 +457,72 @@ export const Donaciones = () => {
     }
   };
 
-  const openRejectModal = (peticionId: string) => {
-    setRejectPeticionId(peticionId);
-    setIsRejectModalOpen(true);
-  };
-
-  const handleConfirmReject = () => {
-    if (rejectPeticionId) {
-      setPeticiones(prev => prev.filter(p => p.id !== rejectPeticionId));
-      toast.success("Solicitud rechazada.");
-    }
-    setIsRejectModalOpen(false);
-    setRejectPeticionId(null);
-  };
-
-  const openConfirmModal = (peticionId: string) => {
-    const selected = selectedForApproval[peticionId] || [];
-    if (selected.length === 0) {
-      toast.error("Selecciona al menos un producto para donar.");
+  const handleAcceptRequests = async (peticionId: string) => {
+    const selectedItems = selectedForApproval[peticionId] || [];
+    if (selectedItems.length === 0) {
+      toast.error("Selecciona al menos un producto para aceptar.");
       return;
     }
-    setConfirmPeticionId(peticionId);
-    setIsConfirmModalOpen(true);
-  };
+    setSubmittingRequestId(peticionId);
+    try {
+      const acceptedShrinkageIds = new Set<number | string>();
+      peticiones.forEach((p) => {
+        p.items.forEach((item) => {
+          if (selectedItems.includes(item.id) && item.shrinkageId !== undefined) {
+            acceptedShrinkageIds.add(item.shrinkageId);
+          }
+        });
+      });
 
-  const handleConfirmAccept = () => {
-    if (confirmPeticionId) {
-      setPeticiones(prev => prev.filter(p => p.id !== confirmPeticionId));
-      toast.success("Donación aceptada y procesada con éxito.");
+      await Promise.all(
+        selectedItems.map((id) => api.patch(`/requests/${id}/accept`))
+      );
+      toast.success("Solicitudes aceptadas con éxito.");
+      setSelectedForApproval((prev) => ({ ...prev, [peticionId]: [] }));
+
+      setPeticiones((prevPeticiones) => {
+        return prevPeticiones
+          .map((p) => {
+            const remainingItems = p.items.filter(
+              (item) => !selectedItems.includes(item.id) && (item.shrinkageId === undefined || !acceptedShrinkageIds.has(item.shrinkageId))
+            );
+            return {
+              ...p,
+              items: remainingItems,
+            };
+          })
+          .filter((p) => p.items.length > 0);
+      });
+
+      await loadPeticiones();
+      await reloadDonations();
+    } catch {
+      toast.error("Ocurrió un error al aceptar las solicitudes.");
+    } finally {
+      setSubmittingRequestId(null);
     }
-    setIsConfirmModalOpen(false);
-    setConfirmPeticionId(null);
   };
 
-  const activePeticionForModal = peticiones.find(p => p.id === confirmPeticionId);
+  const handleRejectRequests = async (peticionId: string) => {
+    const selectedItems = selectedForApproval[peticionId] || [];
+    if (selectedItems.length === 0) {
+      toast.error("Selecciona al menos un producto para rechazar.");
+      return;
+    }
+    setSubmittingRequestId(peticionId);
+    try {
+      await Promise.all(
+        selectedItems.map((id) => api.patch(`/requests/${id}/reject`))
+      );
+      toast.success("Solicitudes rechazadas.");
+      setSelectedForApproval((prev) => ({ ...prev, [peticionId]: [] }));
+      await loadPeticiones();
+    } catch {
+      toast.error("Ocurrió un error al rechazar las solicitudes.");
+    } finally {
+      setSubmittingRequestId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-12 max-w-6xl mx-auto">
@@ -265,7 +535,7 @@ export const Donaciones = () => {
         
         <div className="flex p-1 bg-slate-100 rounded-xl">
           <button
-            onClick={() => { setActiveTab("crear"); setStep(1); }}
+            onClick={() => handleTabChange("crear")}
             className={cn(
               "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all",
               activeTab === "crear" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
@@ -275,7 +545,7 @@ export const Donaciones = () => {
             Donar
           </button>
           <button
-            onClick={() => setActiveTab("peticiones")}
+            onClick={() => handleTabChange("peticiones")}
             className={cn(
               "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all",
               activeTab === "peticiones" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
@@ -290,7 +560,7 @@ export const Donaciones = () => {
             )}
           </button>
           <button
-            onClick={() => setActiveTab("registro")}
+            onClick={() => handleTabChange("registro")}
             className={cn(
               "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all",
               activeTab === "registro" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
@@ -426,7 +696,7 @@ export const Donaciones = () => {
             >
               <div className="flex items-center space-x-4">
                 <button 
-                  onClick={() => setStep(1)}
+                  onClick={async () => { await releaseAllReserved(); setStep(1); }}
                   className="p-2 bg-white border border-slate-200 text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-50 transition-colors"
                 >
                   <ArrowLeft className="w-5 h-5" />
@@ -482,7 +752,7 @@ export const Donaciones = () => {
                           
                           <div className="flex items-center">
                             <button 
-                              onClick={() => handleSetQuantity(item.id, qty > 0 ? 0 : item.maxStock, item.maxStock)}
+                              onClick={() => handleToggleProduct(item)}
                               className={cn(
                                 "px-6 py-2 text-sm font-bold rounded-lg transition-colors shadow-sm",
                                 qty > 0 
@@ -572,7 +842,7 @@ export const Donaciones = () => {
                 <div className="mb-6">
                   <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-2">Resumen de Donación</h4>
                   <ul className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                    {mockMermaDonable.filter(m => (donationQuantities[m.id] || 0) > 0).map(item => (
+                    {mermas.filter(m => (donationQuantities[m.id] || 0) > 0).map(item => (
                       <li key={item.id} className="flex justify-between items-center text-sm">
                         <span className="font-medium text-slate-700">{item.product}</span>
                         <span className="font-bold text-primary">{donationQuantities[item.id]} und.</span>
@@ -695,15 +965,20 @@ export const Donaciones = () => {
                             
                             <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
                               <button 
-                                onClick={() => openRejectModal(peticion.id)}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors"
+                                disabled={submittingRequestId === peticion.id}
+                                onClick={() => handleRejectRequests(peticion.id)}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors flex items-center justify-center"
                               >
                                 Rechazar
                               </button>
                               <button 
-                                onClick={() => openConfirmModal(peticion.id)}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-colors shadow-sm"
+                                disabled={submittingRequestId === peticion.id}
+                                onClick={() => handleAcceptRequests(peticion.id)}
+                                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center min-w-[120px]"
                               >
+                                {submittingRequestId === peticion.id && (
+                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                )}
                                 Aceptar ({selectedItems.length})
                               </button>
                             </div>
@@ -726,14 +1001,14 @@ export const Donaciones = () => {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
-          {mockDonationRecords.length === 0 ? (
+          {donationRecords.length === 0 ? (
             <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl">
               <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-slate-700">No hay registros</h3>
               <p className="text-slate-500 mt-1">Aún no se han procesado donaciones.</p>
             </div>
           ) : (
-            mockDonationRecords.map((record) => (
+            donationRecords.map((record) => (
               <div key={record.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -780,112 +1055,6 @@ export const Donaciones = () => {
         </motion.div>
       )}
 
-      {/* Modal Aceptar Donación (Portal) */}
-      {createPortal(
-        <AnimatePresence>
-          {isConfirmModalOpen && activePeticionForModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsConfirmModalOpen(false)}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6 overflow-hidden flex flex-col max-h-[90vh]"
-              >
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mx-auto mb-4 shrink-0">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-center text-slate-900 mb-2">Confirmar Donación</h3>
-                <p className="text-center text-slate-500 text-sm mb-6">
-                  Se donarán los siguientes productos a <strong className="text-slate-800">{activePeticionForModal.institutionName}</strong>:
-                </p>
-                
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 overflow-y-auto mb-6 max-h-60">
-                  <ul className="space-y-2">
-                    {activePeticionForModal.items
-                      .filter(item => (selectedForApproval[activePeticionForModal.id] || []).includes(item.id))
-                      .map(item => (
-                      <li key={item.id} className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-slate-700">{item.product}</span>
-                        <span className="text-slate-500 font-bold">{item.requestedQty} und.</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="flex gap-3 shrink-0">
-                  <button
-                    onClick={() => setIsConfirmModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleConfirmAccept}
-                    className="flex-1 px-4 py-2.5 text-white bg-primary hover:bg-primary/90 font-bold rounded-xl transition-colors shadow-sm"
-                  >
-                    Confirmar Envío
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
-
-      {/* Modal Rechazar Petición (Portal) */}
-      {createPortal(
-        <AnimatePresence>
-          {isRejectModalOpen && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={() => setIsRejectModalOpen(false)}
-                className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-              />
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 overflow-hidden flex flex-col max-h-[90vh]"
-              >
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-100 text-red-600 mx-auto mb-4 shrink-0">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-                <h3 className="text-xl font-bold text-center text-slate-900 mb-2">Rechazar Solicitud</h3>
-                <p className="text-center text-slate-500 text-sm mb-6">
-                  ¿Estás seguro de que deseas rechazar esta solicitud? Esta acción no se puede deshacer.
-                </p>
-
-                <div className="flex gap-3 shrink-0">
-                  <button
-                    onClick={() => setIsRejectModalOpen(false)}
-                    className="flex-1 px-4 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleConfirmReject}
-                    className="flex-1 px-4 py-2.5 text-white bg-red-600 hover:bg-red-700 font-bold rounded-xl transition-colors shadow-sm"
-                  >
-                    Sí, Rechazar
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>,
-        document.body
-      )}
     </div>
   );
 };

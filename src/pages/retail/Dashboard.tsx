@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart,
@@ -9,25 +9,33 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingDown, TrendingUp, DollarSign, Users, Shield, PackageX, HeartHandshake, Calendar, ChevronDown } from "lucide-react";
+import { DollarSign, Users, Shield, PackageX, HeartHandshake, Calendar, ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { toast } from "sonner";
 
 // Mock Data
-const trendData = [
-  { name: "Ene", merma: 4000, donada: 2400 },
-  { name: "Feb", merma: 3000, donada: 1398 },
-  { name: "Mar", merma: 2000, donada: 9800 },
-  { name: "Abr", merma: 2780, donada: 3908 },
-  { name: "May", merma: 1890, donada: 4800 },
-  { name: "Jun", merma: 2390, donada: 3800 },
+const defaultTrendData = [
+  { name: "Ene", merma: 0, donada: 0 },
+  { name: "Feb", merma: 0, donada: 0 },
+  { name: "Mar", merma: 0, donada: 0 },
+  { name: "Abr", merma: 0, donada: 0 },
+  { name: "May", merma: 0, donada: 0 },
+  { name: "Jun", merma: 0, donada: 0 },
 ];
 
 export const Dashboard = () => {
-  const [donatedTotal, setDonatedTotal] = useState<number | null>(null);
   const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState("Últimos 30 días");
   const filterRef = useRef<HTMLDivElement>(null);
+
+  // Real API States
+  const [totalShrinkageMonth, setTotalShrinkageMonth] = useState<number>(2390);
+  const [totalLostValue, setTotalLostValue] = useState<number>(4500);
+  const [donatedTotal, setDonatedTotal] = useState<number>(1800);
+  const [activeUsers, setActiveUsers] = useState<number>(24);
+  const [configuredRoles, setConfiguredRoles] = useState<number>(5);
+  const [chartData, setChartData] = useState<any[]>(defaultTrendData);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -42,55 +50,77 @@ export const Dashboard = () => {
   useEffect(() => {
     (async () => {
       try {
-        const response = await api.get("/donations/statistics");
-        const total = (response.data || []).reduce(
-          (sum: number, item: { totalQuantityDonated?: number }) => sum + (item.totalQuantityDonated || 0),
-          0
-        );
-        setDonatedTotal(total);
-      } catch {
-        setDonatedTotal(null);
+        const response = await api.get("/retail/dashboard/stats");
+        const data = response.data;
+        if (data) {
+          setTotalShrinkageMonth(data.totalShrinkageMonth);
+          setTotalLostValue(data.totalLostValue);
+          setDonatedTotal(data.totalDonated);
+          setActiveUsers(data.activeUsers);
+          setConfiguredRoles(data.configuredRoles);
+          if (data.monthlyEvolution && data.monthlyEvolution.length > 0) {
+            setChartData(data.monthlyEvolution);
+          }
+        }
+      } catch (err) {
+        // Fallback to mocks if server is not fully up yet
       }
     })();
   }, []);
 
+  const handleDownloadReport = async () => {
+    try {
+      const response = await api.get("/retail/dashboard/report", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "reporte_gestion.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success("Reporte de gestión descargado correctamente.");
+    } catch {
+      toast.error("No se pudo descargar el reporte.");
+    }
+  };
+
   const stats = useMemo(() => [
     {
       name: "Productos Mermados (Mes)",
-      value: "2,390",
+      value: totalShrinkageMonth.toLocaleString("es-PE"),
       icon: PackageX,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       name: "Valor Perdido Estimado",
-      value: "$4,500",
+      value: `$${totalLostValue.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       icon: DollarSign,
       color: "text-red-600",
       bgColor: "bg-red-100",
     },
     {
       name: "Productos Donados",
-      value: donatedTotal !== null ? donatedTotal.toLocaleString("es-PE") : "1,800",
+      value: donatedTotal.toLocaleString("es-PE"),
       icon: HeartHandshake,
       color: "text-emerald-600",
       bgColor: "bg-emerald-100",
     },
     {
       name: "Usuarios Activos",
-      value: "24",
+      value: activeUsers.toString(),
       icon: Users,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
     {
       name: "Roles Configurados",
-      value: "5",
+      value: configuredRoles.toString(),
       icon: Shield,
       color: "text-amber-600",
       bgColor: "bg-amber-100",
     },
-  ], [donatedTotal]);
+  ], [totalShrinkageMonth, totalLostValue, donatedTotal, activeUsers, configuredRoles]);
 
   const dateOptions = [
     "Últimos 7 días",
@@ -110,7 +140,7 @@ export const Dashboard = () => {
     },
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
   };
@@ -123,50 +153,59 @@ export const Dashboard = () => {
           <p className="text-sm text-slate-500 mt-1">Monitorea los indicadores clave de tu merma y donaciones.</p>
         </div>
         
-        <div className="relative" ref={filterRef}>
-          <button 
-            onClick={() => setIsDateFilterOpen(!isDateFilterOpen)}
-            className={cn(
-              "flex items-center justify-between w-48 bg-white border rounded-xl px-3 py-2 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50",
-              isDateFilterOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
-            )}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleDownloadReport}
+            className="flex items-center bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl px-4 py-2 shadow-sm transition-colors focus:outline-none"
           >
-            <div className="flex items-center">
-              <Calendar className="w-4 h-4 text-slate-400 mr-2" />
-              <span className="text-sm font-medium text-slate-700">{selectedDateFilter}</span>
-            </div>
-            <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", isDateFilterOpen ? "rotate-180" : "")} />
+            Descargar Reporte
           </button>
           
-          <AnimatePresence>
-            {isDateFilterOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.15 }}
-                className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
-              >
-                {dateOptions.map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => {
-                      setSelectedDateFilter(option);
-                      setIsDateFilterOpen(false);
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-sm transition-colors",
-                      selectedDateFilter === option 
-                        ? "bg-primary/5 text-primary font-semibold" 
-                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                    )}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="relative" ref={filterRef}>
+            <button 
+              onClick={() => setIsDateFilterOpen(!isDateFilterOpen)}
+              className={cn(
+                "flex items-center justify-between w-48 bg-white border rounded-xl px-3 py-2 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50",
+                isDateFilterOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
+              )}
+            >
+              <div className="flex items-center">
+                <Calendar className="w-4 h-4 text-slate-400 mr-2" />
+                <span className="text-sm font-medium text-slate-700">{selectedDateFilter}</span>
+              </div>
+              <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200", isDateFilterOpen ? "rotate-180" : "")} />
+            </button>
+            
+            <AnimatePresence>
+              {isDateFilterOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
+                >
+                  {dateOptions.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setSelectedDateFilter(option);
+                        setIsDateFilterOpen(false);
+                      }}
+                      className={cn(
+                        "w-full text-left px-4 py-2 text-sm transition-colors",
+                        selectedDateFilter === option 
+                          ? "bg-primary/5 text-primary font-semibold" 
+                          : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -211,7 +250,7 @@ export const Dashboard = () => {
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
-              data={trendData}
+              data={chartData}
               margin={{
                 top: 10,
                 right: 30,

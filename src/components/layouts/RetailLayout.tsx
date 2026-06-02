@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -7,11 +7,8 @@ import {
   HeartHandshake,
   Store,
   Users,
-  ShieldCheck,
   History,
   Settings,
-  Bell,
-  Search,
   Menu,
   X,
   UserCircle,
@@ -20,8 +17,10 @@ import {
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import logoUrl from "../../assets/fluxuspng.png";
+import { useAuth } from "../../hooks/useAuth";
 
 export const RetailLayout = () => {
+  const { isManager } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -33,7 +32,7 @@ export const RetailLayout = () => {
     { name: "Merma", path: "/retail/gestion-merma", icon: Recycle },
     { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake },
     { name: "Locales", path: "/retail/locales", icon: Store },
-    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users },
+    ...(isManager ? [{ name: "Usuarios y Roles", path: "/retail/accesos", icon: Users }] : []),
     { name: "Historial", path: "/retail/historial", icon: History },
     { name: "Configuración", path: "/retail/configuracion", icon: Settings },
   ];

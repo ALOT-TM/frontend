@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "../../services/api";
 import { isAxiosError } from "axios";
 import { cn } from "../../utils/cn";
 import logoUrl from "../../assets/fluxusmini.png";
+import { decodeToken } from "../../components/auth/ProtectedRoute";
 
 export const Login = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -17,15 +18,21 @@ export const Login = () => {
     setIsSubmitting(true);
     try {
       const response = await api.post("/auth/login", {
-        email,
-        rawPassword: password,
+        email: emailRef.current?.value || "",
+        rawPassword: passwordRef.current?.value || "",
       });
       const token = response.data?.token;
       if (!token) {
         throw new Error("Token missing");
       }
       localStorage.setItem("token", token);
-      navigate("/retail/dashboard");
+
+      const payload = decodeToken(token);
+      if (payload && payload.actor === "BENEFICIARY") {
+        navigate("/beneficiary/buscar");
+      } else {
+        navigate("/retail/dashboard");
+      }
     } catch (error) {
       if (isAxiosError(error) && error.response) {
         const status = error.response.status;
@@ -70,8 +77,7 @@ export const Login = () => {
             <label className="text-sm font-medium text-slate-700">Correo Electronico</label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              ref={emailRef}
               className={cn(
                 "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl",
                 "text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
@@ -85,8 +91,7 @@ export const Login = () => {
             <label className="text-sm font-medium text-slate-700">Contraseña</label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              ref={passwordRef}
               className={cn(
                 "w-full px-4 py-3 bg-white border border-slate-200 rounded-xl",
                 "text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",

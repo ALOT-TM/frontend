@@ -1,20 +1,23 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, ShieldCheck, Search, Plus, UserPlus, 
-  MoreVertical, CheckCircle2, XCircle, Mail, Briefcase, 
-  Lock, Key, Edit, Trash2, ArrowRight, ChevronDown, Eye, EyeOff
+  CheckCircle2, XCircle, Mail, Briefcase, 
+  Lock, Key, Edit, Trash2, ChevronDown, Eye, EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 
-// --- Tipos y Mocks ---
+import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
+
+// --- Tipos ---
 interface User {
   id: string;
   username: string;
   email: string;
-  role: string;
+  role: string; // Stores roleId
   status: "active" | "inactive";
   avatarUrl?: string;
   lastLogin: string;
@@ -29,27 +32,12 @@ interface Role {
   isCustom: boolean;
 }
 
-const mockUsers: User[] = [
-  { id: "u1", username: "cmendoza", email: "cmendoza@fluxus.com", role: "Administrador", status: "active", lastLogin: "Hace 2 horas" },
-  { id: "u2", username: "lfernandez", email: "lfernandez@fluxus.com", role: "Gerente de Tienda", status: "active", lastLogin: "Ayer" },
-  { id: "u3", username: "jsoto", email: "jsoto@fluxus.com", role: "Cajero", status: "active", lastLogin: "Hace 5 horas" },
-  { id: "u4", username: "avargas", email: "avargas@fluxus.com", role: "Almacenero", status: "active", lastLogin: "Hoy 08:30 AM" },
-  { id: "u5", username: "rquispe", email: "rquispe@fluxus.com", role: "Cajero", status: "inactive", lastLogin: "Hace 2 semanas" },
-];
-
-const mockRoles: Role[] = [
-  { id: "r1", name: "Administrador", description: "Acceso total al sistema. Puede gestionar locales, usuarios y configuraciones.", userCount: 1, permissions: ["Todo el sistema"], isCustom: false },
-  { id: "r2", name: "Gerente de Tienda", description: "Gestión completa de un local específico, inventario, ventas y mermas.", userCount: 3, permissions: ["Gestión Merma", "Reportes Locales", "Donaciones"], isCustom: false },
-  { id: "r3", name: "Almacenero", description: "Enfocado en el control de stock, ingresos y declaración de mermas.", userCount: 5, permissions: ["Gestión Merma (Lectura/Escritura)", "Inventario"], isCustom: false },
-  { id: "r4", name: "Cajero", description: "Operaciones de punto de venta y consultas básicas.", userCount: 12, permissions: ["Punto de Venta", "Consultar Precios"], isCustom: false },
-  { id: "r5", name: "Auditor Externo", description: "Acceso solo lectura para revisar reportes y movimientos financieros.", userCount: 2, permissions: ["Ver Reportes", "Historial (Lectura)"], isCustom: true },
-];
-
 export const Accesos = () => {
+  const { isManager } = useAuth();
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
 
   // State - Usuarios
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [users, setUsers] = useState<User[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [isRoleFilterOpen, setIsRoleFilterOpen] = useState(false);
@@ -62,6 +50,67 @@ export const Accesos = () => {
   const [isFormRoleOpen, setIsFormRoleOpen] = useState(false);
   const formRoleRef = useRef<HTMLDivElement>(null);
   const [openTooltipId, setOpenTooltipId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+
+  // State - Roles
+  const [roles, setRoles] = useState<Role[]>([]);
+
+  // Modals State
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+
+  // Role Form State
+  const [roleForm, setRoleForm] = useState({ name: "" });
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+
+  // Permissions List
+  const availablePermissions = [
+    { id: "p1", name: "Dashboard", desc: "Métricas y resumen general" },
+    { id: "p2", name: "Merma", desc: "Declarar y revisar mermas" },
+    { id: "p3", name: "Donaciones", desc: "Aprobar donaciones y peticiones" },
+    { id: "p4", name: "Locales", desc: "Crear y editar sucursales" },
+    { id: "p5", name: "Usuarios y Roles", desc: "Administración de usuarios y roles" }
+  ];
+
+  const fetchRoles = async () => {
+    try {
+      const response = await api.get("/auth/roles");
+      const mappedRoles = response.data.map((r: any) => ({
+        id: r.roleId.toString(),
+        name: r.name,
+        description: "Rol en la empresa",
+        userCount: 0,
+        permissions: ["Todo el sistema"],
+        isCustom: true
+      }));
+      setRoles(mappedRoles);
+    } catch (err) {
+      console.error("Error fetching roles", err);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/auth/retail-users");
+      const mappedUsers = response.data.map((u: any) => ({
+        id: u.id.toString(),
+        username: u.username,
+        email: u.email,
+        role: u.roleId ? u.roleId.toString() : "",
+        status: u.retailUserActive ? "active" : "inactive",
+        lastLogin: "Hace poco"
+      }));
+      setUsers(mappedUsers);
+    } catch (err) {
+      console.error("Error fetching users", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchRoles();
+    fetchUsers();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,52 +128,64 @@ export const Accesos = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // State - Roles
-  const [roles, setRoles] = useState<Role[]>(mockRoles);
-
-  // Modals State
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-
-
-  // Role Form State
-  const [roleForm, setRoleForm] = useState({ name: "" });
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
-  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
-
-  // Permissions List
-  const availablePermissions = [
-    { id: "p1", name: "Dashboard", desc: "Métricas y resumen general" },
-    { id: "p2", name: "Merma", desc: "Declarar y revisar mermas" },
-    { id: "p3", name: "Donaciones", desc: "Aprobar donaciones y peticiones" },
-    { id: "p4", name: "Locales", desc: "Crear y editar sucursales" },
-    { id: "p5", name: "Usuarios y Roles", desc: "Administración de usuarios y roles" }
-  ];
+  const getRoleName = (roleId: string) => {
+    return roles.find(r => r.id === roleId)?.name || "Sin Rol";
+  };
 
   // Handlers - Usuarios
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
       const matchesSearch = u.username.toLowerCase().includes(userSearch.toLowerCase()) || 
                             u.email.toLowerCase().includes(userSearch.toLowerCase());
-      const matchesRole = roleFilter === "all" || u.role === roleFilter;
+      const roleName = getRoleName(u.role);
+      const matchesRole = roleFilter === "all" || roleName === roleFilter;
       return matchesSearch && matchesRole;
     });
-  }, [users, userSearch, roleFilter]);
+  }, [users, userSearch, roleFilter, roles]);
 
-  const handleToggleUserStatus = (id: string) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === id) {
-        const newStatus = u.status === "active" ? "inactive" : "active";
-        toast.success(`Usuario ${newStatus === "active" ? "activado" : "desactivado"} exitosamente.`);
-        return { ...u, status: newStatus };
-      }
-      return u;
-    }));
+  const handleQuickRoleChange = async (userId: string, newRoleId: string) => {
+    try {
+      await api.put(`/auth/users/${userId}/role`, {
+        roleId: parseInt(newRoleId)
+      });
+      toast.success("Rol del trabajador actualizado dinámicamente.");
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar el rol.");
+    }
   };
 
-  const handleDeleteUser = (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
-    toast.success("Usuario eliminado del sistema.");
+  const handleToggleUserStatus = async (id: string) => {
+    try {
+      await api.patch(`/auth/retail-users/${id}/status`);
+      toast.success("Estado del usuario actualizado exitosamente.");
+      fetchUsers();
+    } catch (err: any) {
+      toast.error("Error al cambiar estado del usuario");
+    }
+  };
+
+  const handleDeleteUser = async (id: string) => {
+    try {
+      await api.delete(`/auth/retail-users/${id}`);
+      toast.success("Usuario eliminado del sistema.");
+      fetchUsers();
+    } catch (err: any) {
+      toast.error("Error al eliminar usuario");
+    }
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUserId(user.id);
+    setUserForm({
+      username: user.username,
+      email: user.email,
+      password: "",
+      confirmPassword: "",
+      role: user.role,
+      status: user.status
+    });
+    setIsUserModalOpen(true);
   };
 
   // Handlers - Roles
@@ -136,75 +197,85 @@ export const Accesos = () => {
     setIsRoleModalOpen(true);
   };
 
-  const handleDeleteRole = (id: string) => {
-    setRoles(prev => prev.filter(r => r.id !== id));
-    toast.success("Rol eliminado del sistema.");
+  const handleDeleteRole = async (id: string) => {
+    try {
+      await api.delete(`/auth/roles/${id}`);
+      toast.success("Rol eliminado del sistema.");
+      fetchRoles();
+    } catch (err: any) {
+      toast.error("Error al eliminar rol");
+    }
   };
 
-  const handleSaveUser = () => {
-    if (!userForm.username || !userForm.password || !userForm.role) {
+  const handleSaveUser = async () => {
+    if (!userForm.username || !userForm.role) {
       toast.error("Completa los campos obligatorios.");
       return;
     }
-    if (userForm.password !== userForm.confirmPassword) {
+    if (userForm.password && userForm.password !== userForm.confirmPassword) {
       toast.error("Las contraseñas no coinciden.");
       return;
     }
-    const roleName = roles.find(r => r.id === userForm.role)?.name || "Rol Desconocido";
-    
-    const newUser: User = {
-      id: `u${Date.now()}`,
-      username: userForm.username,
-      email: userForm.email || `${userForm.username}@fluxus.com`,
-      role: roleName,
-      status: userForm.status,
-      lastLogin: "Nunca"
-    };
-    
-    setUsers([newUser, ...users]);
-    toast.success("Usuario creado exitosamente.");
-    setIsUserModalOpen(false);
-    setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
-    setShowPassword(false);
-    setShowConfirmPassword(false);
+    try {
+      if (editingUserId) {
+        await api.put(`/auth/retail-users/${editingUserId}`, {
+          username: userForm.username,
+          email: userForm.email || `${userForm.username}@fluxus.com`,
+          roleId: parseInt(userForm.role),
+          password: userForm.password || undefined
+        });
+        await api.put(`/auth/users/${editingUserId}/role`, {
+          roleId: parseInt(userForm.role)
+        });
+        toast.success("Usuario actualizado exitosamente.");
+      } else {
+        if (!userForm.password) {
+          toast.error("La contraseña es requerida para nuevos usuarios.");
+          return;
+        }
+        await api.post("/auth/retail-users", {
+          username: userForm.username,
+          email: userForm.email || `${userForm.username}@fluxus.com`,
+          password: userForm.password,
+          roleId: parseInt(userForm.role)
+        });
+        toast.success("Usuario creado exitosamente.");
+      }
+      setIsUserModalOpen(false);
+      setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
+      setEditingUserId(null);
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al guardar usuario");
+    }
   };
 
-  const handleSaveRole = () => {
+  const handleSaveRole = async () => {
     if (!roleForm.name) {
       toast.error("El rol debe tener un nombre.");
       return;
     }
-    if (selectedPermissions.length === 0) {
-      toast.error("Debes seleccionar al menos un permiso.");
-      return;
+    try {
+      if (editingRoleId) {
+        await api.put(`/auth/roles/${editingRoleId}`, {
+          name: roleForm.name
+        });
+        toast.success("Rol actualizado exitosamente.");
+      } else {
+        await api.post("/auth/roles", {
+          name: roleForm.name
+        });
+        toast.success("Rol creado exitosamente.");
+      }
+      setIsRoleModalOpen(false);
+      setRoleForm({ name: "" });
+      setEditingRoleId(null);
+      fetchRoles();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al guardar el rol");
     }
-    
-    const permNames = availablePermissions.filter(p => selectedPermissions.includes(p.id)).map(p => p.name);
-
-    if (editingRoleId) {
-      setRoles(roles.map(r => r.id === editingRoleId ? {
-        ...r,
-        name: roleForm.name,
-        permissions: permNames
-      } : r));
-      toast.success("Rol actualizado exitosamente.");
-    } else {
-      const newRole: Role = {
-        id: `r${Date.now()}`,
-        name: roleForm.name,
-        description: "Rol personalizado",
-        userCount: 0,
-        permissions: permNames,
-        isCustom: true
-      };
-      setRoles([newRole, ...roles]);
-      toast.success("Rol creado exitosamente.");
-    }
-
-    setIsRoleModalOpen(false);
-    setRoleForm({ name: "" });
-    setSelectedPermissions([]);
-    setEditingRoleId(null);
   };
 
   // Render Helpers
@@ -327,13 +398,15 @@ export const Accesos = () => {
                   </AnimatePresence>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsUserModalOpen(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
-              >
-                <UserPlus className="w-5 h-5 mr-2" />
-                Añadir Usuario
-              </button>
+              {isManager && (
+                <button 
+                  onClick={() => setIsUserModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
+                >
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Añadir Usuario
+                </button>
+              )}
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -373,10 +446,26 @@ export const Accesos = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                              <Briefcase className="w-3 h-3 mr-1" />
-                              {user.role}
-                            </span>
+                            {isManager ? (
+                              <div className="relative inline-block w-48">
+                                <select
+                                  value={user.role}
+                                  onChange={(e) => handleQuickRoleChange(user.id, e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium cursor-pointer"
+                                >
+                                  {roles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                <Briefcase className="w-3 h-3 mr-1" />
+                                {getRoleName(user.role)}
+                              </span>
+                            )}
                           </td>
                           <td className="p-4">
                             <span className={cn(
@@ -396,29 +485,33 @@ export const Accesos = () => {
                             {user.lastLogin}
                           </td>
                           <td className="p-4">
-                            <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleToggleUserStatus(user.id)}
-                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title={user.status === "active" ? "Desactivar" : "Activar"}
-                              >
-                                {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                              </button>
-                              <button 
-                                onClick={() => toast.info("Editar en desarrollo")}
-                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {isManager ? (
+                              <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => handleToggleUserStatus(user.id)}
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                  title={user.status === "active" ? "Desactivar" : "Activar"}
+                                >
+                                  {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                                </button>
+                                <button 
+                                  onClick={() => handleEditUser(user)}
+                                  className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
                           </td>
                         </motion.tr>
                       ))}
@@ -567,6 +660,7 @@ export const Accesos = () => {
                 onClick={() => {
                   setIsUserModalOpen(false);
                   setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
+                  setEditingUserId(null);
                   setShowPassword(false);
                   setShowConfirmPassword(false);
                 }}
@@ -701,6 +795,7 @@ export const Accesos = () => {
                     onClick={() => {
                       setIsUserModalOpen(false);
                       setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
+                      setEditingUserId(null);
                       setShowPassword(false);
                       setShowConfirmPassword(false);
                     }}

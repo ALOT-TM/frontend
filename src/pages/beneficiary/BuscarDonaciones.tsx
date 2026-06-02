@@ -1,63 +1,56 @@
-import React, { useState, useMemo } from "react";
-import { Search, Filter, Package, Plus, Minus, ClipboardList, ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, Package, Plus, Minus, ClipboardList, ChevronLeft, ChevronRight, MoreHorizontal, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useBeneficiaryContext } from "../../components/layouts/BeneficiaryLayout";
 import { CustomSelect } from "../../components/ui/CustomSelect";
 import { cn } from "../../utils/cn";
-
-// Mock data
-const baseItems = [
-  { product: "Pan de Molde Blanco", category: "Panadería" },
-  { product: "Yogurt de Fresa 1L", category: "Lácteos" },
-  { product: "Manzanas Rojas (Bolsa 1kg)", category: "Frutas" },
-  { product: "Arroz Extra 5kg", category: "Abarrotes" },
-  { product: "Leche Entera (Pack 6)", category: "Lácteos" },
-  { product: "Galletas de Avena", category: "Snacks" },
-  { product: "Cereal de Maíz", category: "Abarrotes" },
-  { product: "Tomates (Malla 1kg)", category: "Verduras" },
-  { product: "Queso Edam 250g", category: "Lácteos" },
-  { product: "Fideos Spaghetti", category: "Abarrotes" }
-];
-
-const retailData = [
-  { company: "Supermercado Plaza", hq: "Supermercado Plaza - Surco" },
-  { company: "Supermercado Plaza", hq: "Supermercado Plaza - San Borja" },
-  { company: "EcoMarket", hq: "EcoMarket - Miraflores" },
-  { company: "EcoMarket", hq: "EcoMarket - San Isidro" },
-  { company: "Tiendas del Sur", hq: "Tiendas del Sur - Chorrillos" },
-  { company: "Tiendas del Sur", hq: "Tiendas del Sur - Barranco" }
-];
-
-const mockCatalog = Array.from({ length: 100 }, (_, i) => {
-  const base = baseItems[i % baseItems.length];
-  const retail = retailData[i % retailData.length];
-  const dateOffset = (i * 7) % 90;
-  
-  // Format date correctly YYYY-MM-DD
-  const date = new Date(2026, 5, 1 + dateOffset);
-  const expiryDate = date.toISOString().slice(0, 10);
-  
-  return {
-    id: i + 1,
-    product: `${base.product} ${i > 9 ? `(Lote ${i})` : ''}`.trim(),
-    category: base.category,
-    quantity: (i % 25) + 5,
-    retailCompany: retail.company,
-    headquarterName: retail.hq,
-    expiryDate
-  };
-});
-
-const categories = ["Todas", "Panadería", "Lácteos", "Frutas", "Verduras", "Abarrotes", "Snacks"];
-const retailCompanies = ["Todas", "Supermercado Plaza", "EcoMarket", "Tiendas del Sur"];
+import { api } from "../../services/api";
+import { toast } from "sonner";
 
 export const BuscarDonaciones = () => {
   const { addToCart, removeFromCart, cart } = useBeneficiaryContext();
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
   const [selectedRetail, setSelectedRetail] = useState("Todas");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(6);
+
+  const fetchCatalog = async () => {
+    try {
+      const response = await api.get("/shrinkages/donable");
+      const mappedData = response.data.map((item: any) => ({
+        id: item.shrinkageId,
+        product: item.name,
+        category: item.category?.name || "Sin Categoría",
+        quantity: item.quantity,
+        retailCompany: item.retailCompany?.name || "Comercio",
+        headquarterName: item.retailCompanyHeadquarter?.name || "Sede",
+        expiryDate: item.expirationDate || "Sin Fecha"
+      }));
+      setCatalog(mappedData);
+    } catch (err) {
+      console.error("Error loading donable shrinkages", err);
+      toast.error("Error al cargar el catálogo de donaciones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCatalog();
+  }, []);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(catalog.map(item => item.category)));
+    return ["Todas", ...unique];
+  }, [catalog]);
+
+  const retailCompanies = useMemo(() => {
+    const unique = Array.from(new Set(catalog.map(item => item.retailCompany)));
+    return ["Todas", ...unique];
+  }, [catalog]);
 
   // Helper to generate visible pages with ellipses
   const getVisiblePages = (current: number, total: number) => {
@@ -69,13 +62,13 @@ export const BuscarDonaciones = () => {
 
   // Filter logic
   const filteredItems = useMemo(() => {
-    return mockCatalog.filter((item) => {
+    return catalog.filter((item) => {
       const matchSearch = item.product.toLowerCase().includes(searchTerm.toLowerCase());
       const matchCategory = selectedCategory === "Todas" || item.category === selectedCategory;
       const matchRetail = selectedRetail === "Todas" || item.retailCompany === selectedRetail;
       return matchSearch && matchCategory && matchRetail;
     });
-  }, [searchTerm, selectedCategory, selectedRetail]);
+  }, [catalog, searchTerm, selectedCategory, selectedRetail]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
@@ -129,71 +122,77 @@ export const BuscarDonaciones = () => {
       </div>
 
       {/* Grid of Items */}
-      <AnimatePresence mode="wait">
-        <motion.div 
-          key={`${currentPage}-${itemsPerPage}-${searchTerm}-${selectedCategory}-${selectedRetail}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-        >
-          {paginatedItems.map((item) => {
-            const inCart = cart.some((c) => c.id === item.id);
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  "bg-white rounded-2xl border p-5 flex flex-col transition-all shadow-sm hover:shadow-md group",
-                  inCart ? "border-cyan-500 ring-1 ring-cyan-500" : "border-slate-200"
-                )}
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg">
-                    {item.category}
-                  </span>
-                  <span className="flex items-center text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
-                    Vence: {item.expiryDate}
-                  </span>
-                </div>
-                
-                <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{item.product}</h3>
-                <p className="text-sm text-slate-500 mb-4">{item.headquarterName}</p>
-                
-                <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100">
-                  <div className="flex items-center gap-1.5 text-slate-700">
-                    <Package className="w-4 h-4 text-cyan-600" />
-                    <span className="font-semibold">{item.quantity}</span>
-                    <span className="text-sm text-slate-500">und. disponibles</span>
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <Loader2 className="w-8 h-8 text-cyan-600 animate-spin" />
+        </div>
+      ) : (
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={`${currentPage}-${itemsPerPage}-${searchTerm}-${selectedCategory}-${selectedRetail}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {paginatedItems.map((item) => {
+              const inCart = cart.some((c) => c.id === item.id);
+              return (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "bg-white rounded-2xl border p-5 flex flex-col transition-all shadow-sm hover:shadow-md group",
+                    inCart ? "border-cyan-500 ring-1 ring-cyan-500" : "border-slate-200"
+                  )}
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="px-3 py-1 bg-slate-100 text-slate-600 text-xs font-semibold rounded-lg">
+                      {item.category}
+                    </span>
+                    <span className="flex items-center text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded-md">
+                      Vence: {item.expiryDate}
+                    </span>
                   </div>
                   
-                  <button
-                    onClick={() => inCart ? removeFromCart(item.id) : addToCart(item)}
-                    className={cn(
-                      "p-2 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95",
-                      inCart 
-                        ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100" 
-                        : "bg-orange-500 text-white hover:bg-orange-600"
-                    )}
-                  >
-                    {inCart ? (
-                      <>
-                        <Minus className="w-4 h-4" />
-                        <span className="text-sm font-semibold pr-1">Quitar</span>
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        <span className="text-sm font-semibold pr-1">Añadir</span>
-                      </>
-                    )}
-                  </button>
+                  <h3 className="text-lg font-bold text-slate-900 leading-tight mb-1">{item.product}</h3>
+                  <p className="text-sm text-slate-500 mb-4">{item.headquarterName}</p>
+                  
+                  <div className="mt-auto pt-4 flex items-center justify-between border-t border-slate-100">
+                    <div className="flex items-center gap-1.5 text-slate-700">
+                      <Package className="w-4 h-4 text-cyan-600" />
+                      <span className="font-semibold">{item.quantity}</span>
+                      <span className="text-sm text-slate-500">und. disponibles</span>
+                    </div>
+                    
+                    <button
+                      onClick={() => inCart ? removeFromCart(item.id) : addToCart(item)}
+                      className={cn(
+                        "p-2 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95",
+                        inCart 
+                          ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100" 
+                          : "bg-orange-500 text-white hover:bg-orange-600"
+                      )}
+                    >
+                      {inCart ? (
+                        <>
+                          <Minus className="w-4 h-4" />
+                          <span className="text-sm font-semibold pr-1">Quitar</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          <span className="text-sm font-semibold pr-1">Añadir</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </motion.div>
-      </AnimatePresence>
+              );
+            })}
+          </motion.div>
+        </AnimatePresence>
+      )}
 
       {filteredItems.length === 0 && (
         <div className="py-20 text-center flex flex-col items-center">
