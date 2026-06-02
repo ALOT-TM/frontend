@@ -6,8 +6,10 @@ import { toast } from "sonner";
 import { isAxiosError } from "axios";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { planService } from "../../services/planService";
 
 interface Plan {
+  id: number;
   name: string;
   price: string;
   description: string;
@@ -73,6 +75,9 @@ export const RetailRegistration = () => {
       if (!companyId) {
         throw new Error("Company id missing");
       }
+
+      // Vincular la compañía con el plan seleccionado creando la suscripción
+      await planService.startSubscription(companyId, plan.id);
 
       await api.post("/auth/register", {
         email,
