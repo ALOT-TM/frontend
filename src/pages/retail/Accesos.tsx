@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 // --- Tipos ---
 interface User {
@@ -32,6 +33,7 @@ interface Role {
 }
 
 export const Accesos = () => {
+  const { isManager } = useAuth();
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
 
   // State - Usuarios
@@ -141,6 +143,18 @@ export const Accesos = () => {
     });
   }, [users, userSearch, roleFilter, roles]);
 
+  const handleQuickRoleChange = async (userId: string, newRoleId: string) => {
+    try {
+      await api.put(`/auth/users/${userId}/role`, {
+        roleId: parseInt(newRoleId)
+      });
+      toast.success("Rol del trabajador actualizado dinámicamente.");
+      fetchUsers();
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar el rol.");
+    }
+  };
+
   const handleToggleUserStatus = async (id: string) => {
     try {
       await api.patch(`/auth/retail-users/${id}/status`);
@@ -209,6 +223,9 @@ export const Accesos = () => {
           email: userForm.email || `${userForm.username}@fluxus.com`,
           roleId: parseInt(userForm.role),
           password: userForm.password || undefined
+        });
+        await api.put(`/auth/users/${editingUserId}/role`, {
+          roleId: parseInt(userForm.role)
         });
         toast.success("Usuario actualizado exitosamente.");
       } else {
@@ -381,13 +398,15 @@ export const Accesos = () => {
                   </AnimatePresence>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsUserModalOpen(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
-              >
-                <UserPlus className="w-5 h-5 mr-2" />
-                Añadir Usuario
-              </button>
+              {isManager && (
+                <button 
+                  onClick={() => setIsUserModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
+                >
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Añadir Usuario
+                </button>
+              )}
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -427,10 +446,26 @@ export const Accesos = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                              <Briefcase className="w-3 h-3 mr-1" />
-                              {getRoleName(user.role)}
-                            </span>
+                            {isManager ? (
+                              <div className="relative inline-block w-48">
+                                <select
+                                  value={user.role}
+                                  onChange={(e) => handleQuickRoleChange(user.id, e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium cursor-pointer"
+                                >
+                                  {roles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                                <Briefcase className="w-3 h-3 mr-1" />
+                                {getRoleName(user.role)}
+                              </span>
+                            )}
                           </td>
                           <td className="p-4">
                             <span className={cn(
@@ -450,29 +485,33 @@ export const Accesos = () => {
                             {user.lastLogin}
                           </td>
                           <td className="p-4">
-                            <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleToggleUserStatus(user.id)}
-                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title={user.status === "active" ? "Desactivar" : "Activar"}
-                              >
-                                {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                              </button>
-                              <button 
-                                onClick={() => handleEditUser(user)}
-                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            {isManager ? (
+                              <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => handleToggleUserStatus(user.id)}
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                  title={user.status === "active" ? "Desactivar" : "Activar"}
+                                >
+                                  {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                                </button>
+                                <button 
+                                  onClick={() => handleEditUser(user)}
+                                  className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs">-</span>
+                            )}
                           </td>
                         </motion.tr>
                       ))}
