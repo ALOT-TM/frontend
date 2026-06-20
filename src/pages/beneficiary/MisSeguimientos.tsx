@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 
 type ChildStatus = "Solicitado" | "En Proceso" | "Rechazado" | "Recogido";
-type ParentStatus = "En Proceso" | "Completada";
+type ParentStatus = "En Proceso" | "Completada" | "Rechazada";
 
 interface ChildItem {
   id: number;
@@ -34,7 +34,8 @@ const StatusBadge = ({ status }: { status: ChildStatus | ParentStatus }) => {
     case "En Proceso":
       return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-600 text-xs font-semibold rounded-lg border border-amber-200"><AlertCircle className="w-3.5 h-3.5" /> En Proceso</span>;
     case "Rechazado":
-      return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 text-xs font-semibold rounded-lg border border-red-200"><XCircle className="w-3.5 h-3.5" /> Rechazado</span>;
+    case "Rechazada":
+      return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 text-xs font-semibold rounded-lg border border-red-200"><XCircle className="w-3.5 h-3.5" /> {status}</span>;
     case "Recogido":
     case "Completada":
       return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 text-cyan-600 text-xs font-semibold rounded-lg border border-cyan-200"><CheckCircle2 className="w-3.5 h-3.5" /> {status}</span>;
@@ -145,9 +146,12 @@ export const MisSeguimientos = () => {
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
         
         let displayStatus: ChildStatus = "Solicitado";
+        let parentStatus: ParentStatus = "En Proceso";
         if (req.status === "ACCEPTED") displayStatus = "En Proceso";
-        else if (req.status === "REJECTED") displayStatus = "Rechazado";
-        else if (req.status === "CANCELLED") displayStatus = "Rechazado";
+        else if (req.status === "REJECTED" || req.status === "CANCELLED") {
+          displayStatus = "Rechazado";
+          parentStatus = "Rechazada";
+        }
 
         return {
           id: `PET-${req.donationRequestId?.value || req.id}`,
@@ -155,7 +159,7 @@ export const MisSeguimientos = () => {
           type: "request",
           date: formattedDate,
           headquarterName: headquarter?.description || "Sede Desconocida",
-          status: "En Proceso" as ParentStatus,
+          status: parentStatus,
           items: [{
             id: req.id,
             product: shrinkage?.name || "Cargando...",
@@ -176,7 +180,14 @@ export const MisSeguimientos = () => {
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
 
         let displayStatus: ChildStatus = "En Proceso";
-        if (don.status === "CONFIRMED") displayStatus = "Recogido";
+        let parentStatus: ParentStatus = "En Proceso";
+        if (don.status === "CONFIRMED" || don.status === "PICKED_UP" || don.status === "DONATED") {
+          displayStatus = "Recogido";
+          parentStatus = "Completada";
+        } else if (don.status === "REJECTED" || don.status === "CANCELLED") {
+          displayStatus = "Rechazado";
+          parentStatus = "Rechazada";
+        }
 
         return {
           id: `DON-${don.donationId?.value || don.id}`,
@@ -184,7 +195,7 @@ export const MisSeguimientos = () => {
           type: "donation",
           date: formattedDate,
           headquarterName: headquarter?.description || "Sede Desconocida",
-          status: don.status === "CONFIRMED" ? "Completada" as ParentStatus : "En Proceso" as ParentStatus,
+          status: parentStatus,
           items: [{
             id: don.id,
             product: shrinkage?.name || "Cargando...",
@@ -272,7 +283,7 @@ export const MisSeguimientos = () => {
                   key={donation.id}
                   className={cn(
                     "bg-white rounded-2xl border transition-all shadow-sm overflow-hidden",
-                    isCompleted ? "border-cyan-200" : "border-amber-200"
+                    isCompleted ? "border-cyan-200" : donation.status === "Rechazada" ? "border-red-200" : "border-amber-200"
                   )}
                 >
                   {/* Parent Header */}
@@ -280,13 +291,13 @@ export const MisSeguimientos = () => {
                     onClick={() => toggleExpand(donation.id)}
                     className={cn(
                       "p-5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-slate-50/50",
-                      isCompleted ? "bg-cyan-50/30" : "bg-amber-50/30"
+                      isCompleted ? "bg-cyan-50/30" : donation.status === "Rechazada" ? "bg-red-50/30" : "bg-amber-50/30"
                     )}
                   >
                     <div className="flex items-start gap-4">
                       <div className={cn(
                         "p-3 rounded-xl flex-shrink-0",
-                        isCompleted ? "bg-cyan-100 text-cyan-600" : "bg-amber-100 text-amber-600"
+                        isCompleted ? "bg-cyan-100 text-cyan-600" : donation.status === "Rechazada" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
                       )}>
                         <Package className="w-6 h-6" />
                       </div>

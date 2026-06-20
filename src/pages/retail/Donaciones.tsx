@@ -281,13 +281,13 @@ export const Donaciones = () => {
           product,
           institutionName,
           qty: unwrapAmount(d.quantity) || 0,
-          status: d.status === "CONFIRMED" || d.status === "PICKED_UP" || d.status === "DONATED" ? "Donado" : "Procesando",
+          status: (d.status === "CONFIRMED" || d.status === "PICKED_UP" || d.status === "DONATED") ? "Donado" : (d.status === "REJECTED" || d.status === "CANCELLED") ? "Rechazado" : "Procesando",
           deliveryDate: unwrapValue(d.scheduledPickupDate) || unwrapValue(d.scheduledDeliveryDate) || "-",
         };
       }));
 
       // Add accepted/rejected requests to the log
-      const completedRequests = requests.filter((r: any) => r.status === "ACCEPTED" || r.status === "REJECTED");
+      const completedRequests = requests.filter((r: any) => r.status === "ACCEPTED" || r.status === "REJECTED" || r.status === "CANCELLED");
       const resolvedRequests = await Promise.all(completedRequests.map(async (r: any) => {
         const shrId = unwrapValue(r.shrinkageReferenceId);
         const benId = unwrapValue(r.beneficiaryReferenceId);
@@ -408,7 +408,6 @@ export const Donaciones = () => {
         setDonationQuantities(prev => ({ ...prev, [item.id]: 0 }));
         toast.info(`${item.product} liberado.`);
       }
-      await reloadMerma();
     } catch {
       toast.error("No se pudo actualizar la reserva del producto.");
     }
@@ -560,7 +559,6 @@ export const Donaciones = () => {
       setSelectedForApproval((prev) => ({ ...prev, [peticionId]: [] }));
 
       await loadPeticiones();
-      await loadPeticiones();
       await reloadDonations();
     } catch (error: any) {
       console.error(error);
@@ -585,6 +583,7 @@ export const Donaciones = () => {
       toast.success("Solicitudes rechazadas.");
       setSelectedForApproval((prev) => ({ ...prev, [peticionId]: [] }));
       await loadPeticiones();
+      await reloadDonations();
     } catch {
       toast.error("Ocurrió un error al rechazar las solicitudes.");
     } finally {
