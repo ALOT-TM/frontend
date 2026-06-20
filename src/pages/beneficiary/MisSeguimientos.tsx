@@ -68,6 +68,11 @@ export const MisSeguimientos = () => {
     }
   };
 
+  const unwrapValue = (field: any) => {
+    if (!field) return null;
+    return typeof field === "object" ? field.value : field;
+  };
+
   const fetchFollowUps = async () => {
     try {
       const userId = parseJwtUserId();
@@ -88,13 +93,13 @@ export const MisSeguimientos = () => {
         api.get(`/donations/by-beneficiary/${beneficiaryId}`)
       ]);
 
-      const requestsData = requestsRes.data || [];
-      const donationsData = donationsRes.data || [];
+      const requestsData = Array.isArray(requestsRes.data) ? requestsRes.data : [];
+      const donationsData = Array.isArray(donationsRes.data) ? donationsRes.data : [];
 
-      // Extract unique shrinkage IDs
+      // Extract unique shrinkage IDs using unwrapValue
       const shrinkageIds: number[] = Array.from(new Set([
-        ...requestsData.map((r: any) => r.shrinkageReferenceId?.value).filter(Boolean),
-        ...donationsData.map((d: any) => d.shrinkageReferenceId?.value).filter(Boolean)
+        ...requestsData.map((r: any) => Number(unwrapValue(r.shrinkageReferenceId))).filter(Boolean),
+        ...donationsData.map((d: any) => Number(unwrapValue(d.shrinkageReferenceId))).filter(Boolean)
       ]));
 
       // Fetch all shrinkages details in parallel
@@ -110,8 +115,32 @@ export const MisSeguimientos = () => {
         })
       );
 
+      // Extract unique headquarter IDs from loaded shrinkages
+      const hqIds: number[] = Array.from(new Set(
+        Object.values(shrinkageMap)
+          .map((s: any) => s?.retailCompanyHeadquarterId)
+          .filter(Boolean)
+      ));
+
+      // Fetch all headquarters details in parallel
+      const headquarterMap: Record<number, any> = {};
+      await Promise.all(
+        hqIds.map(async (hqId) => {
+          try {
+            const res = await api.get(`/retail-company-headquarters/${hqId}`);
+            headquarterMap[hqId] = res.data;
+          } catch (err) {
+            console.error(`Error fetching headquarter ${hqId}`, err);
+          }
+        })
+      );
+
       const mappedRequests: ParentDonation[] = requestsData.map((req: any) => {
-        const shrinkage = shrinkageMap[req.shrinkageReferenceId?.value];
+        const shrId = Number(unwrapValue(req.shrinkageReferenceId));
+        const shrinkage = shrinkageMap[shrId];
+        const hqId = shrinkage?.retailCompanyHeadquarterId;
+        const headquarter = hqId ? headquarterMap[hqId] : null;
+
         const dateObj = req.createdAt ? new Date(req.createdAt) : new Date();
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
         
@@ -125,7 +154,7 @@ export const MisSeguimientos = () => {
           realId: req.donationRequestId?.value || req.id,
           type: "request",
           date: formattedDate,
-          headquarterName: shrinkage?.retailCompanyHeadquarter?.name || "Sede Desconocida",
+          headquarterName: headquarter?.description || "Sede Desconocida",
           status: "En Proceso" as ParentStatus,
           items: [{
             id: req.id,
@@ -138,7 +167,11 @@ export const MisSeguimientos = () => {
       });
 
       const mappedDonations: ParentDonation[] = donationsData.map((don: any) => {
-        const shrinkage = shrinkageMap[don.shrinkageReferenceId?.value];
+        const shrId = Number(unwrapValue(don.shrinkageReferenceId));
+        const shrinkage = shrinkageMap[shrId];
+        const hqId = shrinkage?.retailCompanyHeadquarterId;
+        const headquarter = hqId ? headquarterMap[hqId] : null;
+
         const dateObj = don.createdAt ? new Date(don.createdAt) : new Date();
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -150,7 +183,7 @@ export const MisSeguimientos = () => {
           realId: don.donationId?.value || don.id,
           type: "donation",
           date: formattedDate,
-          headquarterName: shrinkage?.retailCompanyHeadquarter?.name || "Sede Desconocida",
+          headquarterName: headquarter?.description || "Sede Desconocida",
           status: don.status === "CONFIRMED" ? "Completada" as ParentStatus : "En Proceso" as ParentStatus,
           items: [{
             id: don.id,
@@ -203,7 +236,8 @@ export const MisSeguimientos = () => {
       setComment("");
       fetchFollowUps();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Error al confirmar la recepción");
+      const msg = err.response?.data || "Error al confirmar la recepción";
+      toast.error(`Error: ${msg}`);
     } finally {
       setIsSubmittingConfirm(false);
     }

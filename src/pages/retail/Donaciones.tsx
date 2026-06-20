@@ -26,6 +26,7 @@ interface RequestedItem {
   product: string;
   requestedQty: number;
   shrinkageId?: number;
+  status?: string;
 }
 
 interface Peticion {
@@ -40,7 +41,7 @@ interface DonationRecord {
   product: string;
   institutionName: string;
   qty: number;
-  status: "Procesando" | "Donado";
+  status: "Procesando" | "Donado" | "Aceptado" | "Rechazado";
   deliveryDate: string;
 }
 
@@ -179,9 +180,8 @@ export const Donaciones = () => {
     try {
       const response = await api.get("/requests/company");
       const requests = response.data || [];
-      const pendingRequests = requests.filter((req: any) => req.status === "PENDING");
       
-      const resolved = await Promise.all(pendingRequests.map(async (req: any) => {
+      const resolved = await Promise.all(requests.map(async (req: any) => {
         const benId = unwrapValue(req.beneficiaryReferenceId);
         const shrId = unwrapValue(req.shrinkageReferenceId);
         const requestId = unwrapValue(req.donationRequestId) || req.id;
@@ -214,6 +214,7 @@ export const Donaciones = () => {
               product,
               requestedQty: maxQty,
               shrinkageId: shrId,
+              status: req.status,
             }
           ]
         };
@@ -236,6 +237,7 @@ export const Donaciones = () => {
           product: item.items[0].product,
           requestedQty: item.items[0].requestedQty,
           shrinkageId: item.items[0].shrinkageId,
+          status: item.items[0].status,
         });
       });
       
@@ -247,10 +249,14 @@ export const Donaciones = () => {
 
   const reloadDonations = async () => {
     try {
-      const response = await api.get("/donations/company");
-      const donations = response.data || [];
+      const [donationsRes, requestsRes] = await Promise.all([
+        api.get("/donations/company").catch(() => ({ data: [] })),
+        api.get("/requests/company").catch(() => ({ data: [] }))
+      ]);
+      const donations = donationsRes.data || [];
+      const requests = requestsRes.data || [];
       
-      const resolved = await Promise.all(donations.map(async (d: any) => {
+      const resolvedDonations = await Promise.all(donations.map(async (d: any) => {
         const shrId = unwrapValue(d.items?.[0]?.shrinkageReferenceId) || unwrapValue(d.shrinkageReferenceId);
         const benId = unwrapValue(d.beneficiaryReferenceId);
         
@@ -275,12 +281,46 @@ export const Donaciones = () => {
           product,
           institutionName,
           qty: unwrapAmount(d.quantity) || 0,
-          status: d.status === "CONFIRMED" || d.status === "DONATED" ? "Donado" : "Procesando",
+          status: d.status === "CONFIRMED" || d.status === "PICKED_UP" || d.status === "DONATED" ? "Donado" : "Procesando",
           deliveryDate: unwrapValue(d.scheduledPickupDate) || unwrapValue(d.scheduledDeliveryDate) || "-",
         };
       }));
+
+      // Add accepted/rejected requests to the log
+      const completedRequests = requests.filter((r: any) => r.status === "ACCEPTED" || r.status === "REJECTED");
+      const resolvedRequests = await Promise.all(completedRequests.map(async (r: any) => {
+        const shrId = unwrapValue(r.shrinkageReferenceId);
+        const benId = unwrapValue(r.beneficiaryReferenceId);
+        
+        let institutionName = `Beneficiario #${benId}`;
+        try {
+          const benRes = await api.get(`/beneficiary-institutions/${benId}`);
+          if (benRes.data?.name) {
+            institutionName = benRes.data.name;
+          }
+        } catch {}
+        
+        let product = `Merma #${shrId}`;
+        let maxQty = 1;
+        try {
+          const shrRes = await api.get(`/shrinkages/${shrId}`);
+          if (shrRes.data?.name) {
+            product = shrRes.data.name;
+            maxQty = shrRes.data.quantity;
+          }
+        } catch {}
+
+        return {
+          id: `req-${unwrapValue(r.donationRequestId) || r.id}`,
+          product,
+          institutionName,
+          qty: maxQty,
+          status: r.status === "ACCEPTED" ? "Aceptado" : "Rechazado",
+          deliveryDate: "-",
+        };
+      }));
       
-      setDonationRecords(resolved);
+      setDonationRecords([...resolvedDonations, ...resolvedRequests] as DonationRecord[]);
     } catch {
       setDonationRecords([]);
     }
@@ -304,13 +344,36 @@ export const Donaciones = () => {
       const current = donationQuantitiesRef.current;
       const reservedIds = Object.keys(current).filter(id => current[id] > 0);
       if (reservedIds.length > 0) {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        // Verify the user is still a RETAIL actor to avoid role mismatch errors on logout/switch
+        try {
+          const parts = token.split(".");
+          if (parts.length >= 2) {
+            const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+            if (payload.actor !== "RETAIL") {
+              return;
+            }
+          }
+        } catch (e) {
+          return;
+        }
+
+        const headers = {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        };
+
         reservedIds.forEach(id => {
           const url = `${import.meta.env.VITE_API_URL}/shrinkages/${id}/donable`;
-          if (navigator.sendBeacon) {
-            navigator.sendBeacon(url);
-          } else {
-            fetch(url, { method: "PATCH", keepalive: true });
-          }
+          // We must use fetch with Authorization headers since the endpoint requires RETAIL actor permissions.
+          // navigator.sendBeacon does not support custom headers, so we use fetch with keepalive.
+          fetch(url, { 
+            method: "PATCH", 
+            keepalive: true,
+            headers
+          }).catch(err => console.error("Error releasing reservation on unmount", err));
         });
       }
     };
@@ -426,7 +489,7 @@ export const Donaciones = () => {
             shrinkageReferenceId: { value: Number(id) },
             beneficiaryReferenceId: { value: Number(selectedInst?.id) },
             quantity: { amount: donationQuantities[id] },
-            scheduledDeliveryDate: { value: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10) }
+            scheduledPickupDate: { value: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10) }
           };
           return api.post("/donations/create", payload);
         })
@@ -464,11 +527,12 @@ export const Donaciones = () => {
     const peticion = peticiones.find(p => p.id === peticionId);
     if (!peticion) return;
     
+    const pendingItems = peticion.items.filter(i => i.status === "PENDING");
     const currentSelected = selectedForApproval[peticionId] || [];
-    if (currentSelected.length === peticion.items.length) {
+    if (currentSelected.length === pendingItems.length) {
       setSelectedForApproval(prev => ({ ...prev, [peticionId]: [] })); // Deselect all
     } else {
-      setSelectedForApproval(prev => ({ ...prev, [peticionId]: peticion.items.map(i => i.id) })); // Select all
+      setSelectedForApproval(prev => ({ ...prev, [peticionId]: pendingItems.map(i => i.id) })); // Select all
     }
   };
 
@@ -495,24 +559,13 @@ export const Donaciones = () => {
       toast.success("Solicitudes aceptadas con éxito.");
       setSelectedForApproval((prev) => ({ ...prev, [peticionId]: [] }));
 
-      setPeticiones((prevPeticiones) => {
-        return prevPeticiones
-          .map((p) => {
-            const remainingItems = p.items.filter(
-              (item) => !selectedItems.includes(item.id) && (item.shrinkageId === undefined || !acceptedShrinkageIds.has(item.shrinkageId))
-            );
-            return {
-              ...p,
-              items: remainingItems,
-            };
-          })
-          .filter((p) => p.items.length > 0);
-      });
-
+      await loadPeticiones();
       await loadPeticiones();
       await reloadDonations();
-    } catch {
-      toast.error("Ocurrió un error al aceptar las solicitudes.");
+    } catch (error: any) {
+      console.error(error);
+      const msg = error?.response?.data || "Ocurrió un error al aceptar las solicitudes.";
+      toast.error(`Error: ${msg}`);
     } finally {
       setSubmittingRequestId(null);
     }
@@ -949,18 +1002,20 @@ export const Donaciones = () => {
                           <p className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Selecciona los productos a aprobar:</p>
                           <div className="space-y-2 mb-6">
                             {peticion.items.map(item => {
+                              const isPending = item.status === "PENDING";
                               const isChecked = selectedItems.includes(item.id);
                               return (
-                                <label key={item.id} className="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
-                                  <div onClick={() => toggleApprovalItem(peticion.id, item.id)} className="mr-4">
-                                    {isChecked ? (
-                                      <CheckSquare className="w-6 h-6 text-primary" />
+                                <label key={item.id} className={cn("flex items-center p-3 bg-white border rounded-xl transition-colors", isPending ? "border-slate-200 cursor-pointer hover:border-primary/50" : "border-slate-100 opacity-60 cursor-not-allowed")}>
+                                  <div onClick={() => isPending && toggleApprovalItem(peticion.id, item.id)} className="mr-4">
+                                    {isPending ? (
+                                      isChecked ? <CheckSquare className="w-6 h-6 text-primary" /> : <Square className="w-6 h-6 text-slate-300" />
                                     ) : (
-                                      <Square className="w-6 h-6 text-slate-300" />
+                                      item.status === "ACCEPTED" ? <CheckSquare className="w-6 h-6 text-emerald-500" /> : <Square className="w-6 h-6 text-slate-300" />
                                     )}
                                   </div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-slate-800">{item.product}</p>
+                                    <p className={cn("font-semibold", isPending ? "text-slate-800" : "text-slate-500 line-through")}>{item.product}</p>
+                                    {!isPending && <p className={cn("text-xs font-bold", item.status === "ACCEPTED" ? "text-emerald-500" : "text-red-400")}>{item.status === "ACCEPTED" ? "Aceptado" : "Rechazado"}</p>}
                                   </div>
                                   <div className="text-sm font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">
                                     Solicita: {item.requestedQty} und.
@@ -970,34 +1025,36 @@ export const Donaciones = () => {
                             })}
                           </div>
 
-                          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200">
-                            <button
-                              onClick={() => handleSelectAllToggle(peticion.id)}
-                              className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors w-full sm:w-auto text-left sm:text-center"
-                            >
-                              {selectedItems.length === peticion.items.length ? "Deseleccionar Todo" : "Seleccionar Todo"}
-                            </button>
-                            
-                            <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
-                              <button 
-                                disabled={submittingRequestId === peticion.id}
-                                onClick={() => handleRejectRequests(peticion.id)}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors flex items-center justify-center"
+                          {peticion.items.some(i => i.status === "PENDING") && (
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200">
+                              <button
+                                onClick={() => handleSelectAllToggle(peticion.id)}
+                                className="text-sm font-semibold text-slate-500 hover:text-slate-800 transition-colors w-full sm:w-auto text-left sm:text-center"
                               >
-                                Rechazar
+                                {selectedItems.length === peticion.items.filter(i => i.status === "PENDING").length ? "Deseleccionar Todo" : "Seleccionar Todo"}
                               </button>
-                              <button 
-                                disabled={submittingRequestId === peticion.id}
-                                onClick={() => handleAcceptRequests(peticion.id)}
-                                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center min-w-[120px]"
-                              >
-                                {submittingRequestId === peticion.id && (
-                                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                )}
-                                Aceptar ({selectedItems.length})
-                              </button>
+                              
+                              <div className="flex items-center gap-3 w-full sm:w-auto mt-2 sm:mt-0">
+                                <button 
+                                  disabled={submittingRequestId === peticion.id}
+                                  onClick={() => handleRejectRequests(peticion.id)}
+                                  className="w-full sm:w-auto px-6 py-2.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 font-medium rounded-xl transition-colors flex items-center justify-center"
+                                >
+                                  Rechazar
+                                </button>
+                                <button 
+                                  disabled={submittingRequestId === peticion.id}
+                                  onClick={() => handleAcceptRequests(peticion.id)}
+                                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-colors shadow-sm flex items-center justify-center min-w-[120px]"
+                                >
+                                  {submittingRequestId === peticion.id && (
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                  )}
+                                  Aceptar ({selectedItems.length})
+                                </button>
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </motion.div>
                     )}
@@ -1058,9 +1115,15 @@ export const Donaciones = () => {
 
                   <div className={cn(
                     "px-4 py-2 rounded-xl text-sm font-bold border flex items-center min-w-[140px] justify-center",
-                    record.status === "Procesando" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-purple-50 text-purple-700 border-purple-200"
+                    record.status === "Procesando" ? "bg-blue-50 text-blue-700 border-blue-200" : 
+                    record.status === "Aceptado" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                    record.status === "Rechazado" ? "bg-red-50 text-red-700 border-red-200" :
+                    "bg-purple-50 text-purple-700 border-purple-200"
                   )}>
-                    {record.status === "Procesando" ? <Truck className="w-4 h-4 mr-2" /> : <HeartHandshake className="w-4 h-4 mr-2" />}
+                    {record.status === "Procesando" ? <Truck className="w-4 h-4 mr-2" /> : 
+                     record.status === "Aceptado" ? <CheckCircle2 className="w-4 h-4 mr-2" /> :
+                     record.status === "Rechazado" ? <CheckCircle2 className="w-4 h-4 mr-2 opacity-50" /> :
+                     <HeartHandshake className="w-4 h-4 mr-2" />}
                     {record.status}
                   </div>
                 </div>
