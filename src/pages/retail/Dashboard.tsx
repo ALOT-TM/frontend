@@ -14,7 +14,7 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { toast } from "sonner";
 
-// Mock Data
+// Empty baseline until the backend returns real metrics.
 const defaultTrendData = [
   { name: "Ene", merma: 0, donada: 0 },
   { name: "Feb", merma: 0, donada: 0 },
@@ -30,11 +30,11 @@ export const Dashboard = () => {
   const filterRef = useRef<HTMLDivElement>(null);
 
   // Real API States
-  const [totalShrinkageMonth, setTotalShrinkageMonth] = useState<number>(2390);
-  const [totalLostValue, setTotalLostValue] = useState<number>(4500);
-  const [donatedTotal, setDonatedTotal] = useState<number>(1800);
-  const [activeUsers, setActiveUsers] = useState<number>(24);
-  const [configuredRoles, setConfiguredRoles] = useState<number>(5);
+  const [totalShrinkageMonth, setTotalShrinkageMonth] = useState<number>(0);
+  const [totalLostValue, setTotalLostValue] = useState<number>(0);
+  const [donatedTotal, setDonatedTotal] = useState<number>(0);
+  const [activeUsers, setActiveUsers] = useState<number>(0);
+  const [configuredRoles, setConfiguredRoles] = useState<number>(0);
   const [chartData, setChartData] = useState<any[]>(defaultTrendData);
 
   useEffect(() => {
@@ -53,17 +53,22 @@ export const Dashboard = () => {
         const response = await api.get("/retail/dashboard/stats");
         const data = response.data;
         if (data) {
-          setTotalShrinkageMonth(data.totalShrinkageMonth);
-          setTotalLostValue(data.totalLostValue);
-          setDonatedTotal(data.totalDonated);
-          setActiveUsers(data.activeUsers);
-          setConfiguredRoles(data.configuredRoles);
+          setTotalShrinkageMonth(data.totalShrinkageMonth ?? 0);
+          setTotalLostValue(data.totalLostValue ?? 0);
+          setDonatedTotal(data.totalDonated ?? 0);
+          setActiveUsers(data.activeUsers ?? 0);
+          setConfiguredRoles(data.configuredRoles ?? 0);
           if (data.monthlyEvolution && data.monthlyEvolution.length > 0) {
             setChartData(data.monthlyEvolution);
           }
         }
-      } catch (err) {
-        // Fallback to mocks if server is not fully up yet
+      } catch {
+        setTotalShrinkageMonth(0);
+        setTotalLostValue(0);
+        setDonatedTotal(0);
+        setActiveUsers(0);
+        setConfiguredRoles(0);
+        setChartData(defaultTrendData);
       }
     })();
   }, []);

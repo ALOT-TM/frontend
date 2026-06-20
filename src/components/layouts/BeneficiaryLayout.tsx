@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Outlet, NavLink, useNavigate, useOutletContext } from "react-router-dom";
 import { Search, ListChecks, Settings, ClipboardList, LogOut, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +31,8 @@ export const BeneficiaryLayout = () => {
   const navigate = useNavigate();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const isSubmittingRequestRef = useRef(false);
 
   const handleLogout = () => {
     toast.success("Sesión cerrada correctamente");
@@ -55,7 +57,9 @@ export const BeneficiaryLayout = () => {
   };
 
   const confirmRequest = async () => {
-    if (cart.length === 0) return;
+    if (cart.length === 0 || isSubmittingRequest || isSubmittingRequestRef.current) return;
+    isSubmittingRequestRef.current = true;
+    setIsSubmittingRequest(true);
     try {
       await Promise.all(
         cart.map((item) =>
@@ -71,6 +75,9 @@ export const BeneficiaryLayout = () => {
       navigate("/beneficiary/seguimientos");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al enviar la solicitud");
+    } finally {
+      isSubmittingRequestRef.current = false;
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -236,7 +243,7 @@ export const BeneficiaryLayout = () => {
               <div className="p-6 border-t border-slate-100 bg-slate-50/50">
                 <button
                   onClick={confirmRequest}
-                  disabled={cart.length === 0}
+                  disabled={cart.length === 0 || isSubmittingRequest}
                   className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl shadow-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ListChecks className="w-5 h-5" />

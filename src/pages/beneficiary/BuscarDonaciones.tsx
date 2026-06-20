@@ -10,6 +10,7 @@ import { toast } from "sonner";
 export const BuscarDonaciones = () => {
   const { addToCart, removeFromCart, cart } = useBeneficiaryContext();
   const [catalog, setCatalog] = useState<any[]>([]);
+  const [requestedShrinkageIds, setRequestedShrinkageIds] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
@@ -17,18 +18,63 @@ export const BuscarDonaciones = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(6);
 
+  const unwrapValue = (field: any) => {
+    if (field && typeof field === "object" && "value" in field) return field.value;
+    return field;
+  };
+
+  const parseJwtUserId = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return null;
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    try {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
+      return payload.userId || payload.sub || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const fetchRequestedShrinkageIds = async () => {
+    const userId = parseJwtUserId();
+    if (!userId) return new Set<number>();
+
+    try {
+      const userRes = await api.get(`/auth/users/${userId}`);
+      const beneficiaryId = userRes.data?.beneficiaryInstitutionId;
+      if (!beneficiaryId) return new Set<number>();
+
+      const requestsRes = await api.get(`/requests?beneficiaryId=${beneficiaryId}`);
+      return new Set<number>(
+        (requestsRes.data || [])
+          .map((request: any) => Number(unwrapValue(request.shrinkageReferenceId)))
+          .filter((id: number) => Number.isFinite(id))
+      );
+    } catch (err) {
+      console.error("Error loading beneficiary donation requests", err);
+      return new Set<number>();
+    }
+  };
+
   const fetchCatalog = async () => {
     try {
-      const response = await api.get("/shrinkages/donable");
+      setLoading(true);
+      const [response, requestedIds] = await Promise.all([
+        api.get("/shrinkages/donable"),
+        fetchRequestedShrinkageIds()
+      ]);
       const mappedData = response.data.map((item: any) => ({
-        id: item.shrinkageId,
+        id: Number(unwrapValue(item.shrinkageId)),
         product: item.name,
         category: item.category?.name || "Sin Categoría",
         quantity: item.quantity,
         retailCompany: item.retailCompany?.name || "Comercio",
         headquarterName: item.retailCompanyHeadquarter?.name || "Sede",
-        expiryDate: item.expirationDate || "Sin Fecha"
+        expiryDate: item.expirationDate || "Sin Fecha",
+        alreadyRequested: requestedIds.has(Number(unwrapValue(item.shrinkageId)))
       }));
+      setRequestedShrinkageIds(requestedIds);
       setCatalog(mappedData);
     } catch (err) {
       console.error("Error loading donable shrinkages", err);
@@ -138,12 +184,17 @@ export const BuscarDonaciones = () => {
           >
             {paginatedItems.map((item) => {
               const inCart = cart.some((c) => c.id === item.id);
+              const alreadyRequested = item.alreadyRequested || requestedShrinkageIds.has(item.id);
               return (
                 <div
                   key={item.id}
                   className={cn(
                     "bg-white rounded-2xl border p-5 flex flex-col transition-all shadow-sm hover:shadow-md group",
-                    inCart ? "border-cyan-500 ring-1 ring-cyan-500" : "border-slate-200"
+                    alreadyRequested
+                      ? "border-slate-200 bg-slate-50 opacity-75"
+                      : inCart
+                        ? "border-cyan-500 ring-1 ring-cyan-500"
+                        : "border-slate-200"
                   )}
                 >
                   <div className="flex justify-between items-start mb-4">
@@ -166,15 +217,29 @@ export const BuscarDonaciones = () => {
                     </div>
                     
                     <button
-                      onClick={() => inCart ? removeFromCart(item.id) : addToCart(item)}
+                      onClick={() => {
+                        if (alreadyRequested) {
+                          toast.info("Ya solicitaste esta merma");
+                          return;
+                        }
+                        inCart ? removeFromCart(item.id) : addToCart(item);
+                      }}
+                      disabled={alreadyRequested}
                       className={cn(
-                        "p-2 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95",
-                        inCart 
+                        "p-2 rounded-xl transition-all focus:outline-none flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:cursor-not-allowed",
+                        alreadyRequested
+                          ? "bg-slate-100 text-slate-500 border border-slate-200"
+                          : inCart 
                           ? "bg-red-50 text-red-600 hover:bg-red-100 border border-red-100" 
                           : "bg-orange-500 text-white hover:bg-orange-600"
                       )}
                     >
-                      {inCart ? (
+                      {alreadyRequested ? (
+                        <>
+                          <ClipboardList className="w-4 h-4" />
+                          <span className="text-sm font-semibold pr-1">Solicitado</span>
+                        </>
+                      ) : inCart ? (
                         <>
                           <Minus className="w-4 h-4" />
                           <span className="text-sm font-semibold pr-1">Quitar</span>

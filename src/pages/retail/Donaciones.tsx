@@ -44,6 +44,20 @@ interface DonationRecord {
   deliveryDate: string;
 }
 
+const unwrapValue = (field: any) => {
+  if (field && typeof field === "object" && "value" in field) {
+    return field.value;
+  }
+  return field;
+};
+
+const unwrapAmount = (field: any) => {
+  if (field && typeof field === "object" && "amount" in field) {
+    return field.amount;
+  }
+  return field;
+};
+
 export const mockInstitutions: Institution[] = [
   { id: "1", name: "Comedor Popular Esperanza", type: "Comedor Social", isFavorite: true },
   { id: "2", name: "ONG Alimentos para Todos", type: "Organización No Gubernamental", isFavorite: false },
@@ -168,8 +182,9 @@ export const Donaciones = () => {
       const pendingRequests = requests.filter((req: any) => req.status === "PENDING");
       
       const resolved = await Promise.all(pendingRequests.map(async (req: any) => {
-        const benId = req.beneficiaryReferenceId?.value;
-        const shrId = req.shrinkageReferenceId?.value;
+        const benId = unwrapValue(req.beneficiaryReferenceId);
+        const shrId = unwrapValue(req.shrinkageReferenceId);
+        const requestId = unwrapValue(req.donationRequestId) || req.id;
         
         let institutionName = `Beneficiario #${benId}`;
         try {
@@ -190,12 +205,12 @@ export const Donaciones = () => {
         } catch {}
         
         return {
-          id: String(req.id || req.donationRequestId?.value),
+          id: String(requestId),
           institutionName,
           date: req.createdAt ? new Date(req.createdAt).toLocaleString() : "Recientemente",
           items: [
             {
-              id: String(req.id || req.donationRequestId?.value),
+              id: String(requestId),
               product,
               requestedQty: maxQty,
               shrinkageId: shrId,
@@ -236,8 +251,8 @@ export const Donaciones = () => {
       const donations = response.data || [];
       
       const resolved = await Promise.all(donations.map(async (d: any) => {
-        const shrId = d.items?.[0]?.shrinkageReferenceId?.value || d.shrinkageReferenceId?.value;
-        const benId = d.beneficiaryReferenceId?.value;
+        const shrId = unwrapValue(d.items?.[0]?.shrinkageReferenceId) || unwrapValue(d.shrinkageReferenceId);
+        const benId = unwrapValue(d.beneficiaryReferenceId);
         
         let institutionName = `Beneficiario #${benId}`;
         try {
@@ -256,12 +271,12 @@ export const Donaciones = () => {
         } catch {}
         
         return {
-          id: String(d.donationId?.value || d.id),
+          id: String(unwrapValue(d.donationId) || d.id),
           product,
           institutionName,
-          qty: d.quantity?.amount || 0,
+          qty: unwrapAmount(d.quantity) || 0,
           status: d.status === "CONFIRMED" || d.status === "DONATED" ? "Donado" : "Procesando",
-          deliveryDate: d.scheduledDeliveryDate?.value || "-",
+          deliveryDate: unwrapValue(d.scheduledPickupDate) || unwrapValue(d.scheduledDeliveryDate) || "-",
         };
       }));
       
