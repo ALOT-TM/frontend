@@ -163,13 +163,19 @@ export const Donaciones = () => {
     try {
       const response = await api.get("/beneficiary-institutions");
       const list = response.data || [];
+      const storedFavs = localStorage.getItem('favorite_institutions');
+      const favoriteIds: string[] = storedFavs ? JSON.parse(storedFavs) : [];
+      
       setInstitutions(
-        list.map((bi: any) => ({
-          id: String(bi.beneficiaryInstitutionId),
-          name: bi.name,
-          type: bi.institutionType?.name || "Sin tipo",
-          isFavorite: false,
-        }))
+        list.map((bi: any) => {
+          const instId = String(bi.beneficiaryInstitutionId);
+          return {
+            id: instId,
+            name: bi.name,
+            type: bi.institutionType?.name || "Sin tipo",
+            isFavorite: favoriteIds.includes(instId),
+          };
+        })
       );
     } catch {
       setInstitutions([]);
@@ -423,7 +429,12 @@ export const Donaciones = () => {
 
   // --- Handlers Tab 1 ---
   const toggleFavorite = (id: string) => {
-    setInstitutions(insts => insts.map(i => i.id === id ? { ...i, isFavorite: !i.isFavorite } : i));
+    setInstitutions(insts => {
+      const updated = insts.map(i => i.id === id ? { ...i, isFavorite: !i.isFavorite } : i);
+      const favoriteIds = updated.filter(i => i.isFavorite).map(i => i.id);
+      localStorage.setItem('favorite_institutions', JSON.stringify(favoriteIds));
+      return updated;
+    });
   };
 
   const filteredInstitutions = useMemo(() => {
@@ -1098,7 +1109,9 @@ export const Donaciones = () => {
                   <div className="text-right">
                     <p className="text-xs text-slate-400 font-medium uppercase tracking-wider mb-1">Fecha Entrega</p>
                     <div className="flex items-center justify-end text-sm font-semibold text-slate-700">
-                      {record.deliveryDate !== "-" ? (
+                      {record.status === "Rechazado" ? (
+                        <span className="text-slate-400 font-normal">—</span>
+                      ) : record.deliveryDate !== "-" ? (
                         <>
                           <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-500" />
                           {record.deliveryDate}

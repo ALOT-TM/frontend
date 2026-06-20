@@ -49,10 +49,7 @@ function App() {
               <Route path="donaciones" element={<Donaciones />} />
               <Route path="locales" element={<Locales />} />
               
-              {/* Ruta restringida: Solo el MANAGER de retail puede gestionar accesos */}
-              <Route element={<RoleGuard allowedRoles={["RETAIL_MANAGER"]} />}>
-                <Route path="accesos" element={<Accesos />} />
-              </Route>
+              <Route path="accesos" element={<Accesos />} />
               
               <Route path="historial" element={<Historial />} />
               <Route path="configuracion" element={<Configuracion />} />
