@@ -53,6 +53,7 @@ export const Accesos = () => {
 
   // State - Roles
   const [roles, setRoles] = useState<Role[]>([]);
+  const [fullAccessRoleId, setFullAccessRoleId] = useState<string | null>(null);
 
   // Modals State
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -75,6 +76,10 @@ export const Accesos = () => {
   const fetchRoles = async () => {
     try {
       const response = await api.get("/auth/roles");
+      const fullAccessRole = response.data.find((r: any) => r.name === "RETAIL_FULL_ACCESS");
+      if (fullAccessRole) {
+        setFullAccessRoleId(fullAccessRole.roleId.toString());
+      }
       const mappedRoles = response.data
         .filter((r: any) => r.name !== "RETAIL_FULL_ACCESS")
         .map((r: any) => ({
@@ -151,6 +156,7 @@ export const Accesos = () => {
       });
       toast.success("Rol del trabajador actualizado dinámicamente.");
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al actualizar el rol.");
     }
@@ -171,6 +177,7 @@ export const Accesos = () => {
       await api.delete(`/auth/retail-users/${id}`);
       toast.success("Usuario eliminado del sistema.");
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error("Error al eliminar usuario");
     }
@@ -199,6 +206,11 @@ export const Accesos = () => {
   };
 
   const handleDeleteRole = async (id: string) => {
+    const role = roles.find(r => r.id === id);
+    if (role && role.userCount > 0) {
+      toast.error("No se puede eliminar el rol porque está asignado a uno o más usuarios.");
+      return;
+    }
     try {
       await api.delete(`/auth/roles/${id}`);
       toast.success("Rol eliminado del sistema.");
@@ -248,6 +260,7 @@ export const Accesos = () => {
       setShowPassword(false);
       setShowConfirmPassword(false);
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al guardar usuario");
     }
@@ -450,17 +463,23 @@ export const Accesos = () => {
                           </td>
                           <td className="p-4">
                             <div className="relative inline-block w-48">
-                              <select
-                                value={user.role}
-                                onChange={(e) => handleQuickRoleChange(user.id, e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium cursor-pointer"
-                              >
-                                {roles.map((r) => (
-                                  <option key={r.id} value={r.id}>
-                                    {r.name}
-                                  </option>
-                                ))}
-                              </select>
+                              {fullAccessRoleId && user.role === fullAccessRoleId ? (
+                                <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  RETAIL_FULL_ACCESS (Admin)
+                                </span>
+                              ) : (
+                                <select
+                                  value={user.role}
+                                  onChange={(e) => handleQuickRoleChange(user.id, e.target.value)}
+                                  className="w-full bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary font-medium cursor-pointer"
+                                >
+                                  {roles.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                      {r.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
                             </div>
                           </td>
                           <td className="p-4">
@@ -735,16 +754,23 @@ export const Accesos = () => {
                       <label className="text-sm font-semibold text-slate-700 block mb-1.5">Rol *</label>
                       <button
                         type="button"
+                        disabled={fullAccessRoleId !== null && userForm.role === fullAccessRoleId}
                         onClick={() => setIsFormRoleOpen(!isFormRoleOpen)}
                         className={cn(
                           "flex items-center justify-between w-full px-4 py-2 bg-white border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors",
-                          isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
+                          fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                            ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
+                            : isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
                         )}
                       >
                         <span className={cn("truncate", !userForm.role && "text-slate-500")}>
-                          {userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
+                          {fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                            ? "RETAIL_FULL_ACCESS"
+                            : userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
                         </span>
-                        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
+                        {!(fullAccessRoleId !== null && userForm.role === fullAccessRoleId) && (
+                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
+                        )}
                       </button>
 
                       <AnimatePresence>
