@@ -106,9 +106,23 @@ export const mockDonationRecords: DonationRecord[] = [
 
 import { useRef } from "react";
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 export const Donaciones = () => {
-  const [activeTab, setActiveTab] = useState<"crear" | "peticiones" | "registro">("crear");
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("Gestionar Donaciones");
+
+  const [activeTab, setActiveTab] = useState<"crear" | "peticiones" | "registro">(
+    "peticiones"
+  );
+
+  useEffect(() => {
+    if (canManage) {
+      setActiveTab("crear");
+    } else {
+      setActiveTab("peticiones");
+    }
+  }, [canManage]);
 
   // --- Estado Tab 1: Crear Donación ---
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -612,16 +626,18 @@ export const Donaciones = () => {
         </div>
         
         <div className="flex p-1 bg-slate-100 rounded-xl">
-          <button
-            onClick={() => handleTabChange("crear")}
-            className={cn(
-              "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all",
-              activeTab === "crear" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
-            )}
-          >
-            <HeartHandshake className="w-4 h-4 mr-2" />
-            Donar
-          </button>
+          {canManage && (
+            <button
+              onClick={() => handleTabChange("crear")}
+              className={cn(
+                "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all",
+                activeTab === "crear" ? "bg-white text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <HeartHandshake className="w-4 h-4 mr-2" />
+              Donar
+            </button>
+          )}
           <button
             onClick={() => handleTabChange("peticiones")}
             className={cn(
@@ -1009,20 +1025,24 @@ export const Donaciones = () => {
                         className="border-t border-slate-100 bg-slate-50/50"
                       >
                         <div className="p-6">
-                          <p className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">Selecciona los productos a aprobar:</p>
+                          <p className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4">
+                            {canManage ? "Selecciona los productos a aprobar:" : "Productos solicitados:"}
+                          </p>
                           <div className="space-y-2 mb-6">
                             {peticion.items.map(item => {
                               const isPending = item.status === "PENDING";
                               const isChecked = selectedItems.includes(item.id);
                               return (
-                                <label key={item.id} className={cn("flex items-center p-3 bg-white border rounded-xl transition-colors", isPending ? "border-slate-200 cursor-pointer hover:border-primary/50" : "border-slate-100 opacity-60 cursor-not-allowed")}>
-                                  <div onClick={() => isPending && toggleApprovalItem(peticion.id, item.id)} className="mr-4">
-                                    {isPending ? (
-                                      isChecked ? <CheckSquare className="w-6 h-6 text-primary" /> : <Square className="w-6 h-6 text-slate-300" />
-                                    ) : (
-                                      item.status === "ACCEPTED" ? <CheckSquare className="w-6 h-6 text-emerald-500" /> : <Square className="w-6 h-6 text-slate-300" />
-                                    )}
-                                  </div>
+                                <label key={item.id} className={cn("flex items-center p-3 bg-white border rounded-xl transition-colors", isPending && canManage ? "border-slate-200 cursor-pointer hover:border-primary/50" : "border-slate-100 opacity-60 cursor-not-allowed")}>
+                                  {canManage && (
+                                    <div onClick={() => isPending && toggleApprovalItem(peticion.id, item.id)} className="mr-4">
+                                      {isPending ? (
+                                        isChecked ? <CheckSquare className="w-6 h-6 text-primary" /> : <Square className="w-6 h-6 text-slate-300" />
+                                      ) : (
+                                        item.status === "ACCEPTED" ? <CheckSquare className="w-6 h-6 text-emerald-500" /> : <Square className="w-6 h-6 text-slate-300" />
+                                      )}
+                                    </div>
+                                  )}
                                   <div className="flex-1">
                                     <p className={cn("font-semibold", isPending ? "text-slate-800" : "text-slate-500 line-through")}>{item.product}</p>
                                     {!isPending && <p className={cn("text-xs font-bold", item.status === "ACCEPTED" ? "text-emerald-500" : "text-red-400")}>{item.status === "ACCEPTED" ? "Aceptado" : "Rechazado"}</p>}
@@ -1035,7 +1055,7 @@ export const Donaciones = () => {
                             })}
                           </div>
 
-                          {peticion.items.some(i => i.status === "PENDING") && (
+                          {canManage && peticion.items.some(i => i.status === "PENDING") && (
                             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200">
                               <button
                                 onClick={() => handleSelectAllToggle(peticion.id)}

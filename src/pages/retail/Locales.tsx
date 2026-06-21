@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, MapPin, Store, AlertTriangle, X, PackageX, Chevron
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 // Tipos
 interface Local {
@@ -116,6 +117,8 @@ const CustomSelect = ({
 };
 
 export const Locales = () => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("Gestionar Locales");
   const [locales, setLocales] = useState<Local[]>([]);
   const [headquarters, setHeadquarters] = useState<RetailCompanyHeadquarterDto[]>([]);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
@@ -338,13 +341,15 @@ export const Locales = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Mis Locales</h2>
           <p className="text-sm text-slate-500 mt-1">Gestiona la información y estado de tus sucursales.</p>
         </div>
-        <button
-          onClick={() => openSlideOver()}
-          className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Añadir Nuevo Local
-        </button>
+        {canManage && (
+          <button
+            onClick={() => openSlideOver()}
+            className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Añadir Nuevo Local
+          </button>
+        )}
       </div>
 
       {/* Grid de Tarjetas */}
@@ -388,22 +393,24 @@ export const Locales = () => {
               </div>
               
               {/* Acciones */}
-              <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button
-                  onClick={() => openSlideOver(local)}
-                  className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                  title="Editar Local"
-                >
-                  <Edit2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => confirmDelete(local.id)}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Eliminar Local"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
+              {canManage && (
+                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    onClick={() => openSlideOver(local)}
+                    className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                    title="Editar Local"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(local.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Eliminar Local"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}

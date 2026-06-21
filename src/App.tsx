@@ -45,23 +45,23 @@ function App() {
           <Route element={<RoleGuard allowedRoles={["RETAIL"]} />}>
             <Route path="/retail" element={<RetailLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route element={<PermissionGuard permission="Dashboard" />}>
+              <Route element={<PermissionGuard permission="Ver Dashboard" />}>
                 <Route path="dashboard" element={<Dashboard />} />
               </Route>
               
-              <Route element={<PermissionGuard permission="Merma" />}>
+              <Route element={<PermissionGuard permission="Ver Mermas" />}>
                 <Route path="gestion-merma" element={<GestionMerma />} />
               </Route>
               
-              <Route element={<PermissionGuard permission="Donaciones" />}>
+              <Route element={<PermissionGuard permission="Ver Donaciones" />}>
                 <Route path="donaciones" element={<Donaciones />} />
               </Route>
               
-              <Route element={<PermissionGuard permission="Locales" />}>
+              <Route element={<PermissionGuard permission="Ver Locales" />}>
                 <Route path="locales" element={<Locales />} />
               </Route>
               
-              <Route element={<PermissionGuard permission="Usuarios y Roles" />}>
+              <Route element={<PermissionGuard permission="Ver Usuarios y Roles" />}>
                 <Route path="accesos" element={<Accesos />} />
               </Route>
               

@@ -12,6 +12,8 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 
 
+import { useAuth } from "../../hooks/useAuth";
+
 // --- Tipos ---
 interface User {
   id: string;
@@ -33,6 +35,9 @@ interface Role {
 }
 
 export const Accesos = () => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("Gestionar Usuarios y Roles");
+
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
 
   // State - Usuarios
@@ -66,11 +71,15 @@ export const Accesos = () => {
 
   // Permissions List
   const availablePermissions = [
-    { id: "p1", name: "Dashboard", desc: "Métricas y resumen general" },
-    { id: "p2", name: "Merma", desc: "Declarar y revisar mermas" },
-    { id: "p3", name: "Donaciones", desc: "Aprobar donaciones y peticiones" },
-    { id: "p4", name: "Locales", desc: "Crear y editar sucursales" },
-    { id: "p5", name: "Usuarios y Roles", desc: "Administración de usuarios y roles" }
+    { id: "p1", name: "Ver Dashboard", desc: "Permite ver las métricas y resumen general" },
+    { id: "p2", name: "Ver Mermas", desc: "Permite ver el listado y reportes de mermas" },
+    { id: "p3", name: "Registrar Merma", desc: "Permite declarar, editar y eliminar registros de merma" },
+    { id: "p4", name: "Ver Donaciones", desc: "Permite ver las solicitudes de donación e historial" },
+    { id: "p5", name: "Gestionar Donaciones", desc: "Permite aprobar, rechazar o cambiar estados de donación" },
+    { id: "p6", name: "Ver Locales", desc: "Permite ver las sucursales de la empresa" },
+    { id: "p7", name: "Gestionar Locales", desc: "Permite agregar, editar y eliminar sucursales" },
+    { id: "p8", name: "Ver Usuarios y Roles", desc: "Permite ver usuarios, sus roles y permisos" },
+    { id: "p9", name: "Gestionar Usuarios y Roles", desc: "Permite crear/editar/eliminar usuarios y roles" }
   ];
 
   const fetchRoles = async () => {
@@ -416,13 +425,15 @@ export const Accesos = () => {
                   </AnimatePresence>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsUserModalOpen(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
-              >
-                <UserPlus className="w-5 h-5 mr-2" />
-                Añadir Usuario
-              </button>
+              {canManage && (
+                <button 
+                  onClick={() => setIsUserModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
+                >
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Añadir Usuario
+                </button>
+              )}
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
@@ -434,7 +445,7 @@ export const Accesos = () => {
                       <th className="p-4 font-semibold">Rol</th>
                       <th className="p-4 font-semibold">Estado</th>
                       <th className="p-4 font-semibold">Último Acceso</th>
-                      <th className="p-4 font-semibold text-right rounded-tr-2xl">Acciones</th>
+                      {canManage && <th className="p-4 font-semibold text-right rounded-tr-2xl">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -466,6 +477,10 @@ export const Accesos = () => {
                               {fullAccessRoleId && user.role === fullAccessRoleId ? (
                                 <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                   RETAIL_FULL_ACCESS (Admin)
+                                </span>
+                              ) : !canManage ? (
+                                <span className="text-xs font-semibold text-slate-600">
+                                  {roles.find(r => r.id === user.role)?.name || "Sin Rol"}
                                 </span>
                               ) : (
                                 <select
@@ -499,37 +514,39 @@ export const Accesos = () => {
                           <td className="p-4 text-sm text-slate-500">
                             {user.lastLogin}
                           </td>
-                          <td className="p-4">
-                            <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
-                                onClick={() => handleToggleUserStatus(user.id)}
-                                className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                                title={user.status === "active" ? "Desactivar" : "Activar"}
-                              >
-                                {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                              </button>
-                              <button 
-                                onClick={() => handleEditUser(user)}
-                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title="Editar"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
+                          {canManage && (
+                            <td className="p-4">
+                              <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                  onClick={() => handleToggleUserStatus(user.id)}
+                                  className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                                  title={user.status === "active" ? "Desactivar" : "Activar"}
+                                >
+                                  {user.status === "active" ? <Lock className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                                </button>
+                                <button 
+                                  onClick={() => handleEditUser(user)}
+                                  className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </motion.tr>
                       ))}
                     </AnimatePresence>
                     {filteredUsers.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-500">
+                        <td colSpan={canManage ? 5 : 4} className="p-8 text-center text-slate-500">
                           No se encontraron usuarios.
                         </td>
                       </tr>
@@ -551,15 +568,17 @@ export const Accesos = () => {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            <div className="flex justify-end items-center mb-6">
-              <button 
-                onClick={() => setIsRoleModalOpen(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Crear Nuevo Rol
-              </button>
-            </div>
+            {canManage && (
+              <div className="flex justify-end items-center mb-6">
+                <button 
+                  onClick={() => setIsRoleModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Crear Nuevo Rol
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
@@ -629,22 +648,24 @@ export const Accesos = () => {
                         <Users className="w-4 h-4 mr-1.5 text-slate-400" />
                         {role.userCount} {role.userCount === 1 ? 'Usuario' : 'Usuarios'}
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <button 
-                          onClick={() => handleEditRole(role)}
-                          className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteRole(role.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {canManage && (
+                        <div className="flex items-center space-x-1">
+                          <button 
+                            onClick={() => handleEditRole(role)}
+                            className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteRole(role.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}

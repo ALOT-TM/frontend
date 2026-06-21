@@ -8,6 +8,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 
 type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente" | "En Proceso" | "Donado";
@@ -171,6 +172,9 @@ const CustomSelect = ({
 };
 
 export const GestionMerma = () => {
+  const { hasPermission } = useAuth();
+  const canRegister = hasPermission("Registrar Merma");
+
   // State
   const [items, setItems] = useState<MermaItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -418,13 +422,15 @@ export const GestionMerma = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Gestión de Merma</h2>
           <p className="text-sm text-slate-500 mt-1">Inventario detallado de productos mermados y su estado.</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Añadir Producto
-        </button>
+        {canRegister && (
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Añadir Producto
+          </button>
+        )}
       </div>
 
       {/* Filters Bar */}
@@ -549,7 +555,7 @@ export const GestionMerma = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center h-8">
                         <AnimatePresence mode="wait">
-                          {item.status !== "Pendiente" ? (
+                          {item.status !== "Pendiente" || !canRegister ? (
                             <motion.div
                               key="badge"
                               initial={{ opacity: 0, scale: 0.8 }}

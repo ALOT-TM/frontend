@@ -44,11 +44,11 @@ export const RetailLayout = () => {
   const { hasPermission } = useAuth();
   
   const navLinks = [
-    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard, permission: "Dashboard" },
-    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle, permission: "Merma" },
-    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake, permission: "Donaciones" },
-    { name: "Locales", path: "/retail/locales", icon: Store, permission: "Locales" },
-    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users, permission: "Usuarios y Roles" },
+    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard, permission: "Ver Dashboard" },
+    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle, permission: "Ver Mermas" },
+    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake, permission: "Ver Donaciones" },
+    { name: "Locales", path: "/retail/locales", icon: Store, permission: "Ver Locales" },
+    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users, permission: "Ver Usuarios y Roles" },
     { name: "Historial", path: "/retail/historial", icon: History },
     { name: "Configuración", path: "/retail/configuracion", icon: Settings },
   ].filter(link => !link.permission || hasPermission(link.permission));
