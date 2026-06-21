@@ -307,7 +307,7 @@ export const Donaciones = () => {
       }));
 
       // Add pending/accepted/rejected requests to the log
-      const completedRequests = requests.filter((r: any) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "REJECTED" || r.status === "CANCELLED");
+      const completedRequests = requests.filter((r: any) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "REJECTED" || r.status === "CANCELLED" || r.status === "COMPLETED");
       const resolvedRequests = await Promise.all(completedRequests.map(async (r: any) => {
         const shrId = unwrapValue(r.shrinkageReferenceId);
         const benId = unwrapValue(r.beneficiaryReferenceId);
@@ -335,8 +335,8 @@ export const Donaciones = () => {
           product,
           institutionName,
           qty: maxQty,
-          status: r.status === "PENDING" ? "Solicitado" : r.status === "ACCEPTED" ? "Aceptado" : "Rechazado",
-          deliveryDate: "-",
+          status: r.status === "PENDING" ? "Solicitado" : r.status === "ACCEPTED" ? "Aceptado" : r.status === "COMPLETED" ? "Donado" : "Rechazado",
+          deliveryDate: unwrapValue(r.pickupConfirmationDate) || "-",
         };
       }));
       

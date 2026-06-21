@@ -52,6 +52,7 @@ export const MisSeguimientos = () => {
   // Modal State for Confirmation Form
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmingDonationId, setConfirmingDonationId] = useState<number | null>(null);
+  const [confirmingType, setConfirmingType] = useState<"request" | "donation" | null>(null);
   const [receptionDate, setReceptionDate] = useState(new Date().toISOString().split("T")[0]);
   const [comment, setComment] = useState("");
   const [isSubmittingConfirm, setIsSubmittingConfirm] = useState(false);
@@ -148,6 +149,10 @@ export const MisSeguimientos = () => {
         let displayStatus: ChildStatus = "Solicitado";
         let parentStatus: ParentStatus = "En Proceso";
         if (req.status === "ACCEPTED") displayStatus = "En Proceso";
+        else if (req.status === "COMPLETED") {
+          displayStatus = "Recogido";
+          parentStatus = "Completada";
+        }
         else if (req.status === "REJECTED" || req.status === "CANCELLED") {
           displayStatus = "Rechazado";
           parentStatus = "Rechazada";
@@ -227,23 +232,29 @@ export const MisSeguimientos = () => {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleMarkAsRecogidoClick = (realId: number) => {
+  const handleMarkAsRecogidoClick = (realId: number, type: "request" | "donation") => {
     setConfirmingDonationId(realId);
+    setConfirmingType(type);
     setConfirmModalOpen(true);
   };
 
   const handleConfirmReception = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!confirmingDonationId) return;
+    if (!confirmingDonationId || !confirmingType) return;
     setIsSubmittingConfirm(true);
     try {
-      await api.patch(`/donations/${confirmingDonationId}/confirm`, {
+      const endpoint = confirmingType === "request"
+        ? `/requests/${confirmingDonationId}/confirm`
+        : `/donations/${confirmingDonationId}/confirm`;
+
+      await api.patch(endpoint, {
         receptionDate: receptionDate,
         comment: comment || "Entrega realizada satisfactoriamente"
       });
-      toast.success("¡Donación confirmada como recogida!");
+      toast.success(confirmingType === "request" ? "¡Solicitud confirmada como recogida!" : "¡Donación confirmada como recogida!");
       setConfirmModalOpen(false);
       setConfirmingDonationId(null);
+      setConfirmingType(null);
       setComment("");
       fetchFollowUps();
     } catch (err: any) {
@@ -346,9 +357,9 @@ export const MisSeguimientos = () => {
                                 <div className="flex items-center gap-4 justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
                                   <StatusBadge status={item.status} />
                                   
-                                  {donation.type === "donation" && item.status === "En Proceso" && (
+                                  {item.status === "En Proceso" && (
                                     <button
-                                      onClick={() => handleMarkAsRecogidoClick(donation.realId)}
+                                      onClick={() => handleMarkAsRecogidoClick(donation.realId, donation.type)}
                                       className="px-3 py-1.5 bg-white border border-cyan-200 text-cyan-600 hover:bg-cyan-50 text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
                                     >
                                       <CheckCircle2 className="w-3.5 h-3.5" /> Marcar como Recogido
