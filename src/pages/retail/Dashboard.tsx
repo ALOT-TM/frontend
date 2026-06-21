@@ -50,7 +50,9 @@ export const Dashboard = () => {
   useEffect(() => {
     (async () => {
       try {
-        const response = await api.get("/retail/dashboard/stats");
+        const response = await api.get("/retail/dashboard/stats", {
+          params: { period: selectedDateFilter }
+        });
         const data = response.data;
         if (data) {
           setTotalShrinkageMonth(data.totalShrinkageMonth ?? 0);
@@ -71,7 +73,7 @@ export const Dashboard = () => {
         setChartData(defaultTrendData);
       }
     })();
-  }, []);
+  }, [selectedDateFilter]);
 
   const handleDownloadReport = async () => {
     try {
@@ -91,7 +93,10 @@ export const Dashboard = () => {
 
   const stats = useMemo(() => [
     {
-      name: "Productos Mermados (Mes)",
+      name: selectedDateFilter === "Últimos 7 días" ? "Productos Mermados (7d)" :
+            selectedDateFilter === "Últimos 30 días" ? "Productos Mermados (Mes)" :
+            selectedDateFilter === "Últimos 3 meses" ? "Productos Mermados (3 meses)" :
+            selectedDateFilter === "Este año" ? "Productos Mermados (Año)" : "Productos Mermados (Total)",
       value: totalShrinkageMonth.toLocaleString("es-PE"),
       icon: PackageX,
       color: "text-blue-600",
@@ -125,7 +130,7 @@ export const Dashboard = () => {
       color: "text-amber-600",
       bgColor: "bg-amber-100",
     },
-  ], [totalShrinkageMonth, totalLostValue, donatedTotal, activeUsers, configuredRoles]);
+  ], [totalShrinkageMonth, totalLostValue, donatedTotal, activeUsers, configuredRoles, selectedDateFilter]);
 
   const dateOptions = [
     "Últimos 7 días",
@@ -250,7 +255,13 @@ export const Dashboard = () => {
       >
         <div className="mb-6">
           <h3 className="text-lg font-bold text-slate-900">Evolución de Merma vs Donaciones</h3>
-          <p className="text-sm text-slate-500">Histórico de los últimos 6 meses (cantidad de productos).</p>
+          <p className="text-sm text-slate-500">
+            {selectedDateFilter === "Últimos 7 días" && "Histórico de los últimos 7 días (cantidad de productos)."}
+            {selectedDateFilter === "Últimos 30 días" && "Histórico de los últimos 30 días (cantidad de productos)."}
+            {selectedDateFilter === "Últimos 3 meses" && "Histórico de los últimos 3 meses (cantidad de productos)."}
+            {selectedDateFilter === "Este año" && "Evolución mensual durante este año (cantidad de productos)."}
+            {selectedDateFilter === "Todo el tiempo" && "Histórico de los últimos 12 meses (cantidad de productos)."}
+          </p>
         </div>
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">
