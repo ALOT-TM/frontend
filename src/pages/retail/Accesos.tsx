@@ -81,7 +81,7 @@ export const Accesos = () => {
           id: r.roleId.toString(),
           name: r.name,
           description: "Rol en la empresa",
-          userCount: 0,
+          userCount: r.userCount || 0,
           permissions: r.permissions && r.permissions.length > 0 ? r.permissions : ["Todo el sistema"],
           isCustom: true
         }));
@@ -204,7 +204,7 @@ export const Accesos = () => {
       toast.success("Rol eliminado del sistema.");
       fetchRoles();
     } catch (err: any) {
-      toast.error("Error al eliminar rol");
+      toast.error(err.response?.data?.message || "Error al eliminar rol");
     }
   };
 
