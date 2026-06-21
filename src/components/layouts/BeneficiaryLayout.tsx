@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate, useOutletContext } from "react-router-dom";
 import { Search, ListChecks, Settings, ClipboardList, LogOut, Trash2, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +33,26 @@ export const BeneficiaryLayout = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const isSubmittingRequestRef = useRef(false);
+  const [institutionName, setInstitutionName] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const profileResponse = await api.get("/auth/profile");
+        const profile = profileResponse.data || {};
+        setEmail(profile.email || null);
+
+        if (profile.beneficiaryInstitutionId) {
+          const institutionResponse = await api.get(`/beneficiary-institutions/${profile.beneficiaryInstitutionId}`);
+          setInstitutionName(institutionResponse.data?.name || null);
+        }
+      } catch {
+        setInstitutionName(null);
+        setEmail(null);
+      }
+    })();
+  }, []);
 
   const handleLogout = () => {
     toast.success("Sesión cerrada correctamente");
@@ -156,8 +176,12 @@ export const BeneficiaryLayout = () => {
 
               {/* User Profile */}
               <div className="hidden sm:flex flex-col items-end justify-center">
-                <span className="text-sm font-bold text-slate-900 leading-tight">Fundación Ayuda Sur</span>
-                <span className="text-xs text-slate-500">contacto@fundacionayudasur.org</span>
+                <span className="text-sm font-bold text-slate-900 leading-tight">
+                  {institutionName || "Fundación"}
+                </span>
+                <span className="text-xs text-slate-500">
+                  {email || "correo"}
+                </span>
               </div>
               <button
                 onClick={handleLogout}
