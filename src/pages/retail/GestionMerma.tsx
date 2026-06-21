@@ -10,7 +10,7 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 
 
-type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente";
+type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente" | "En Proceso" | "Donado";
 
 interface MermaItem {
   id: number;
@@ -75,6 +75,8 @@ const StatusBadge = ({ status }: { status: MermaStatus }) => {
     "No Donable": "bg-red-100 text-red-700 border-red-200",
     "Solicitado": "bg-amber-100 text-amber-700 border-amber-200",
     "Pendiente": "bg-slate-100 text-slate-700 border-slate-200",
+    "En Proceso": "bg-blue-100 text-blue-700 border-blue-200",
+    "Donado": "bg-purple-100 text-purple-700 border-purple-200",
   };
 
   return (
@@ -201,9 +203,11 @@ export const GestionMerma = () => {
       case "NOT_DONABLE":
         return "No Donable";
       case "REQUESTED":
+        return "Donable";
       case "IN_PROCESS":
+        return "En Proceso";
       case "DONATED":
-        return "Solicitado";
+        return "Donado";
       case "NONE":
         return "Pendiente";
       default:
@@ -463,7 +467,7 @@ export const GestionMerma = () => {
                 transition={{ duration: 0.15 }}
                 className="absolute left-0 right-0 xl:right-auto xl:w-48 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
               >
-                {["Todos", "Pendiente", "Donable", "No Donable", "Solicitado"].map((status) => (
+                {["Todos", "Pendiente", "Donable", "No Donable", "En Proceso", "Donado"].map((status) => (
                   <button
                     key={status}
                     onClick={() => {

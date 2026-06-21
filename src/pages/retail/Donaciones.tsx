@@ -41,7 +41,7 @@ interface DonationRecord {
   product: string;
   institutionName: string;
   qty: number;
-  status: "Procesando" | "Donado" | "Aceptado" | "Rechazado";
+  status: "Procesando" | "Donado" | "Aceptado" | "Rechazado" | "Solicitado";
   deliveryDate: string;
 }
 
@@ -292,8 +292,8 @@ export const Donaciones = () => {
         };
       }));
 
-      // Add accepted/rejected requests to the log
-      const completedRequests = requests.filter((r: any) => r.status === "ACCEPTED" || r.status === "REJECTED" || r.status === "CANCELLED");
+      // Add pending/accepted/rejected requests to the log
+      const completedRequests = requests.filter((r: any) => r.status === "PENDING" || r.status === "ACCEPTED" || r.status === "REJECTED" || r.status === "CANCELLED");
       const resolvedRequests = await Promise.all(completedRequests.map(async (r: any) => {
         const shrId = unwrapValue(r.shrinkageReferenceId);
         const benId = unwrapValue(r.beneficiaryReferenceId);
@@ -321,7 +321,7 @@ export const Donaciones = () => {
           product,
           institutionName,
           qty: maxQty,
-          status: r.status === "ACCEPTED" ? "Aceptado" : "Rechazado",
+          status: r.status === "PENDING" ? "Solicitado" : r.status === "ACCEPTED" ? "Aceptado" : "Rechazado",
           deliveryDate: "-",
         };
       }));
@@ -1127,12 +1127,14 @@ export const Donaciones = () => {
 
                   <div className={cn(
                     "px-4 py-2 rounded-xl text-sm font-bold border flex items-center min-w-[140px] justify-center",
+                    record.status === "Solicitado" ? "bg-amber-50 text-amber-700 border-amber-200" :
                     record.status === "Procesando" ? "bg-blue-50 text-blue-700 border-blue-200" : 
                     record.status === "Aceptado" ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
                     record.status === "Rechazado" ? "bg-red-50 text-red-700 border-red-200" :
                     "bg-purple-50 text-purple-700 border-purple-200"
                   )}>
-                    {record.status === "Procesando" ? <Truck className="w-4 h-4 mr-2" /> : 
+                    {record.status === "Solicitado" ? <Clock className="w-4 h-4 mr-2" /> :
+                     record.status === "Procesando" ? <Truck className="w-4 h-4 mr-2" /> : 
                      record.status === "Aceptado" ? <CheckCircle2 className="w-4 h-4 mr-2" /> :
                      record.status === "Rechazado" ? <CheckCircle2 className="w-4 h-4 mr-2 opacity-50" /> :
                      <HeartHandshake className="w-4 h-4 mr-2" />}
