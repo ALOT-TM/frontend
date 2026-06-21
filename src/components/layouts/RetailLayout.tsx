@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +17,21 @@ import {
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import logoUrl from "../../assets/fluxuspng.png";
+
+interface RetailLayoutContextType {
+  setCompanyName: (name: string | null) => void;
+  setUsername: (name: string | null) => void;
+}
+
+export const RetailLayoutContext = createContext<RetailLayoutContextType | null>(null);
+
+export const useRetailLayout = () => {
+  const context = useContext(RetailLayoutContext);
+  if (!context) {
+    throw new Error("useRetailLayout must be used within a RetailLayoutContext.Provider");
+  }
+  return context;
+};
 
 export const RetailLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -72,7 +87,8 @@ export const RetailLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+    <RetailLayoutContext.Provider value={{ setCompanyName, setUsername }}>
+      <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -212,5 +228,6 @@ export const RetailLayout = () => {
         </main>
       </div>
     </div>
+    </RetailLayoutContext.Provider>
   );
 };

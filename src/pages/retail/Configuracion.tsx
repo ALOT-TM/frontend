@@ -13,9 +13,26 @@ import {
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { useRetailLayout } from "../../components/layouts/RetailLayout";
 
 export const Configuracion = () => {
   const [activeTab, setActiveTab] = useState<"usuario" | "empresa" | "seguridad" | "suscripcion">("usuario");
+  const { setCompanyName: setHeaderCompanyName, setUsername: setHeaderUsername } = useRetailLayout();
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const formatted = date.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+    const parts = formatted.split(" ");
+    if (parts.length >= 3) {
+      parts[2] = parts[2].charAt(0).toUpperCase() + parts[2].slice(1);
+    }
+    return parts.join(" ");
+  };
 
   // --- Perfil de Usuario State ---
   const [username, setUsername] = useState("");
@@ -46,15 +63,19 @@ export const Configuracion = () => {
           const userResponse = await api.get(`/auth/users/${userId}`);
           const fetchedUsername = userResponse.data?.username || "";
           const fetchedEmail = userResponse.data?.email || "";
+          const fetchedCreatedAt = userResponse.data?.createdAt || "";
           setUsername(fetchedUsername);
           setUserRecoveryEmail(fetchedEmail);
+          setUserCreatedAt(fetchedCreatedAt);
           setInitialUsername(fetchedUsername);
           setInitialEmail(fetchedEmail);
 
           const companyId = userResponse.data?.retailCompanyId;
           if (companyId) {
             const companyResponse = await api.get(`/retail-companies/${companyId}`);
-            setCompanyName(companyResponse.data?.name || "Retail Company");
+            const fetchedCompanyName = companyResponse.data?.name || "";
+            setCompanyName(fetchedCompanyName);
+            setInitialCompanyName(fetchedCompanyName);
           }
         }
       } catch (err) {
@@ -83,6 +104,7 @@ export const Configuracion = () => {
       setUserRecoveryEmail(updatedUser.email);
       setInitialUsername(updatedUser.username);
       setInitialEmail(updatedUser.email);
+      setHeaderUsername(updatedUser.username);
       toast.success("Perfil de usuario actualizado");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al actualizar perfil");
@@ -92,26 +114,44 @@ export const Configuracion = () => {
   };
 
   // --- Configuración de Empresa State ---
-  const [companyName, setCompanyName] = useState("Retail Solutions S.A.");
+  const [companyName, setCompanyName] = useState("");
+  const [initialCompanyName, setInitialCompanyName] = useState("");
   const [companyPhone, setCompanyPhone] = useState("+1 234 567 8900");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [hasCompanyChanges, setHasCompanyChanges] = useState(false);
 
   useEffect(() => {
     setHasCompanyChanges(
-      companyName !== "Retail Solutions S.A." && 
+      companyName !== initialCompanyName && 
       companyName !== ""
     );
-  }, [companyName]);
+  }, [companyName, initialCompanyName]);
 
-  const handleSaveCompany = (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingCompany(true);
-    setTimeout(() => {
+    try {
+      const userId = parseJwtUserId();
+      if (!userId) return;
+
+      const userResponse = await api.get(`/auth/users/${userId}`);
+      const companyId = userResponse.data?.retailCompanyId;
+      if (companyId) {
+        const response = await api.put(`/retail-companies/${companyId}`, {
+          name: companyName
+        });
+        const updatedName = response.data?.name || "";
+        setCompanyName(updatedName);
+        setInitialCompanyName(updatedName);
+        setHeaderCompanyName(updatedName);
+        toast.success("Datos de empresa actualizados");
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar la empresa");
+    } finally {
       setIsSavingCompany(false);
-      setHasCompanyChanges(false);
-      toast.success("Datos de empresa actualizados");
-    }, 1000);
+    }
   };
 
   // --- Seguridad State ---
@@ -327,7 +367,7 @@ export const Configuracion = () => {
                       <label className="text-sm font-medium text-slate-700">Miembro desde</label>
                       <input
                         type="text"
-                        value="15 de Enero de 2024"
+                        value={formatDate(userCreatedAt)}
                         disabled
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
                       />
