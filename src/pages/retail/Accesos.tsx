@@ -80,7 +80,7 @@ export const Accesos = () => {
         name: r.name,
         description: "Rol en la empresa",
         userCount: 0,
-        permissions: ["Todo el sistema"],
+        permissions: r.permissions && r.permissions.length > 0 ? r.permissions : ["Todo el sistema"],
         isCustom: true
       }));
       setRoles(mappedRoles);
@@ -257,14 +257,18 @@ export const Accesos = () => {
       return;
     }
     try {
+      const permissionNames = selectedPermissions.map(id => availablePermissions.find(p => p.id === id)?.name).filter(Boolean);
+      
       if (editingRoleId) {
         await api.put(`/auth/roles/${editingRoleId}`, {
-          name: roleForm.name
+          name: roleForm.name,
+          permissions: permissionNames
         });
         toast.success("Rol actualizado exitosamente.");
       } else {
         await api.post("/auth/roles", {
-          name: roleForm.name
+          name: roleForm.name,
+          permissions: permissionNames
         });
         toast.success("Rol creado exitosamente.");
       }
