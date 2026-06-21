@@ -17,6 +17,7 @@ import {
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import logoUrl from "../../assets/fluxuspng.png";
+import { useAuth } from "../../hooks/useAuth";
 
 interface RetailLayoutContextType {
   setCompanyName: (name: string | null) => void;
@@ -40,15 +41,17 @@ export const RetailLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { hasPermission } = useAuth();
+  
   const navLinks = [
-    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard },
-    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle },
-    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake },
-    { name: "Locales", path: "/retail/locales", icon: Store },
-    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users },
+    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard, permission: "Dashboard" },
+    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle, permission: "Merma" },
+    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake, permission: "Donaciones" },
+    { name: "Locales", path: "/retail/locales", icon: Store, permission: "Locales" },
+    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users, permission: "Usuarios y Roles" },
     { name: "Historial", path: "/retail/historial", icon: History },
     { name: "Configuración", path: "/retail/configuracion", icon: Settings },
-  ];
+  ].filter(link => !link.permission || hasPermission(link.permission));
 
   useEffect(() => {
     (async () => {

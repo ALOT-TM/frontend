@@ -14,10 +14,13 @@ import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { useRetailLayout } from "../../components/layouts/RetailLayout";
+import { useAuth } from "../../hooks/useAuth";
 
 export const Configuracion = () => {
   const [activeTab, setActiveTab] = useState<"usuario" | "empresa" | "seguridad" | "suscripcion">("usuario");
   const { setCompanyName: setHeaderCompanyName, setUsername: setHeaderUsername } = useRetailLayout();
+  const { hasPermission } = useAuth();
+  const isFullAccess = hasPermission("Todo el sistema");
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
@@ -334,7 +337,10 @@ export const Configuracion = () => {
                       <div className="w-24 h-24 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
                         <Building2 className="w-8 h-8 text-slate-300" />
                       </div>
-                      <button type="button" className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm self-start">
+                      <button 
+                        type="button" 
+                        disabled={!isFullAccess}
+                        className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm self-start disabled:opacity-50 disabled:cursor-not-allowed">
                         Cambiar logo
                       </button>
                     </div>
@@ -349,7 +355,8 @@ export const Configuracion = () => {
                         type="text"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm"
+                        disabled={!isFullAccess}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
 
@@ -359,7 +366,8 @@ export const Configuracion = () => {
                         type="text"
                         value={companyPhone}
                         onChange={(e) => setCompanyPhone(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm"
+                        disabled={!isFullAccess}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
 
@@ -377,7 +385,7 @@ export const Configuracion = () => {
                   <div className="pt-4 flex justify-end">
                     <button
                       type="submit"
-                      disabled={!hasCompanyChanges || isSavingCompany}
+                      disabled={!hasCompanyChanges || isSavingCompany || !isFullAccess}
                       className="px-6 py-2.5 bg-slate-900 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 flex items-center shadow-sm"
                     >
                       {isSavingCompany ? (
@@ -505,7 +513,9 @@ export const Configuracion = () => {
                       <p className="text-slate-400 text-sm">Tu suscripción se renueva el 15 de Octubre de 2026.</p>
                     </div>
                     <div className="mt-4 md:mt-0">
-                      <button className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm">
+                      <button 
+                        disabled={!isFullAccess}
+                        className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                         Gestionar Plan
                       </button>
                     </div>

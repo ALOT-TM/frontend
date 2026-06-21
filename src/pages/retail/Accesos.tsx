@@ -75,14 +75,16 @@ export const Accesos = () => {
   const fetchRoles = async () => {
     try {
       const response = await api.get("/auth/roles");
-      const mappedRoles = response.data.map((r: any) => ({
-        id: r.roleId.toString(),
-        name: r.name,
-        description: "Rol en la empresa",
-        userCount: 0,
-        permissions: r.permissions && r.permissions.length > 0 ? r.permissions : ["Todo el sistema"],
-        isCustom: true
-      }));
+      const mappedRoles = response.data
+        .filter((r: any) => r.name !== "RETAIL_FULL_ACCESS")
+        .map((r: any) => ({
+          id: r.roleId.toString(),
+          name: r.name,
+          description: "Rol en la empresa",
+          userCount: 0,
+          permissions: r.permissions && r.permissions.length > 0 ? r.permissions : ["Todo el sistema"],
+          isCustom: true
+        }));
       setRoles(mappedRoles);
     } catch (err) {
       console.error("Error fetching roles", err);

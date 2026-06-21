@@ -19,6 +19,7 @@ import { MisSeguimientos } from "./pages/beneficiary/MisSeguimientos";
 import { ConfiguracionBeneficiario } from "./pages/beneficiary/ConfiguracionBeneficiario";
 import { Toaster } from "sonner";
 import { RoleGuard } from "./components/auth/RoleGuard";
+import { PermissionGuard } from "./components/auth/PermissionGuard";
 import { AccessDenied } from "./pages/auth/AccessDenied";
 
 function App() {
@@ -44,12 +45,25 @@ function App() {
           <Route element={<RoleGuard allowedRoles={["RETAIL"]} />}>
             <Route path="/retail" element={<RetailLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="gestion-merma" element={<GestionMerma />} />
-              <Route path="donaciones" element={<Donaciones />} />
-              <Route path="locales" element={<Locales />} />
+              <Route element={<PermissionGuard permission="Dashboard" />}>
+                <Route path="dashboard" element={<Dashboard />} />
+              </Route>
               
-              <Route path="accesos" element={<Accesos />} />
+              <Route element={<PermissionGuard permission="Merma" />}>
+                <Route path="gestion-merma" element={<GestionMerma />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Donaciones" />}>
+                <Route path="donaciones" element={<Donaciones />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Locales" />}>
+                <Route path="locales" element={<Locales />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Usuarios y Roles" />}>
+                <Route path="accesos" element={<Accesos />} />
+              </Route>
               
               <Route path="historial" element={<Historial />} />
               <Route path="configuracion" element={<Configuracion />} />
