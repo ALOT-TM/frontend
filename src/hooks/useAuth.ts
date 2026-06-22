@@ -8,6 +8,7 @@ export interface DecodedToken {
   beneficiaryInstitutionId?: number;
   roleId?: number;
   roleName?: string;
+  permissions?: string[];
   iat: number;
   exp: number;
 }
@@ -58,6 +59,12 @@ export const useAuth = () => {
   const isAnalyst = role === "RETAIL_ANALYST" || role === "ROLE_RETAIL_ANALYST";
   const isRsc = role === "RETAIL_RSC" || role === "ROLE_RETAIL_RSC";
 
+  const hasPermission = (permissionName: string) => {
+    if (role === "RETAIL_FULL_ACCESS") return true;
+    if (user?.permissions?.includes("Todo el sistema")) return true;
+    return user?.permissions?.includes(permissionName) || false;
+  };
+
   return {
     user,
     role,
@@ -68,5 +75,6 @@ export const useAuth = () => {
     isAuditor,
     isAnalyst,
     isRsc,
+    hasPermission,
   };
 };

@@ -13,9 +13,29 @@ import {
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { useRetailLayout } from "../../components/layouts/RetailLayout";
+import { useAuth } from "../../hooks/useAuth";
 
 export const Configuracion = () => {
   const [activeTab, setActiveTab] = useState<"usuario" | "empresa" | "seguridad" | "suscripcion">("usuario");
+  const { setCompanyName: setHeaderCompanyName, setUsername: setHeaderUsername } = useRetailLayout();
+  const { hasPermission } = useAuth();
+  const isFullAccess = hasPermission("Todo el sistema");
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const formatted = date.toLocaleDateString("es-ES", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+    const parts = formatted.split(" ");
+    if (parts.length >= 3) {
+      parts[2] = parts[2].charAt(0).toUpperCase() + parts[2].slice(1);
+    }
+    return parts.join(" ");
+  };
 
   // --- Perfil de Usuario State ---
   const [username, setUsername] = useState("");
@@ -46,15 +66,19 @@ export const Configuracion = () => {
           const userResponse = await api.get(`/auth/users/${userId}`);
           const fetchedUsername = userResponse.data?.username || "";
           const fetchedEmail = userResponse.data?.email || "";
+          const fetchedCreatedAt = userResponse.data?.createdAt || "";
           setUsername(fetchedUsername);
           setUserRecoveryEmail(fetchedEmail);
+          setUserCreatedAt(fetchedCreatedAt);
           setInitialUsername(fetchedUsername);
           setInitialEmail(fetchedEmail);
 
           const companyId = userResponse.data?.retailCompanyId;
           if (companyId) {
             const companyResponse = await api.get(`/retail-companies/${companyId}`);
-            setCompanyName(companyResponse.data?.name || "Retail Company");
+            const fetchedCompanyName = companyResponse.data?.name || "";
+            setCompanyName(fetchedCompanyName);
+            setInitialCompanyName(fetchedCompanyName);
           }
         }
       } catch (err) {
@@ -83,6 +107,7 @@ export const Configuracion = () => {
       setUserRecoveryEmail(updatedUser.email);
       setInitialUsername(updatedUser.username);
       setInitialEmail(updatedUser.email);
+      setHeaderUsername(updatedUser.username);
       toast.success("Perfil de usuario actualizado");
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al actualizar perfil");
@@ -92,26 +117,44 @@ export const Configuracion = () => {
   };
 
   // --- Configuración de Empresa State ---
-  const [companyName, setCompanyName] = useState("Retail Solutions S.A.");
+  const [companyName, setCompanyName] = useState("");
+  const [initialCompanyName, setInitialCompanyName] = useState("");
   const [companyPhone, setCompanyPhone] = useState("+1 234 567 8900");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [hasCompanyChanges, setHasCompanyChanges] = useState(false);
 
   useEffect(() => {
     setHasCompanyChanges(
-      companyName !== "Retail Solutions S.A." && 
+      companyName !== initialCompanyName && 
       companyName !== ""
     );
-  }, [companyName]);
+  }, [companyName, initialCompanyName]);
 
-  const handleSaveCompany = (e: React.FormEvent) => {
+  const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingCompany(true);
-    setTimeout(() => {
+    try {
+      const userId = parseJwtUserId();
+      if (!userId) return;
+
+      const userResponse = await api.get(`/auth/users/${userId}`);
+      const companyId = userResponse.data?.retailCompanyId;
+      if (companyId) {
+        const response = await api.put(`/retail-companies/${companyId}`, {
+          name: companyName
+        });
+        const updatedName = response.data?.name || "";
+        setCompanyName(updatedName);
+        setInitialCompanyName(updatedName);
+        setHeaderCompanyName(updatedName);
+        toast.success("Datos de empresa actualizados");
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Error al actualizar la empresa");
+    } finally {
       setIsSavingCompany(false);
-      setHasCompanyChanges(false);
-      toast.success("Datos de empresa actualizados");
-    }, 1000);
+    }
   };
 
   // --- Seguridad State ---
@@ -294,7 +337,10 @@ export const Configuracion = () => {
                       <div className="w-24 h-24 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center shadow-sm overflow-hidden">
                         <Building2 className="w-8 h-8 text-slate-300" />
                       </div>
-                      <button type="button" className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm self-start">
+                      <button 
+                        type="button" 
+                        disabled={!isFullAccess}
+                        className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors shadow-sm self-start disabled:opacity-50 disabled:cursor-not-allowed">
                         Cambiar logo
                       </button>
                     </div>
@@ -309,7 +355,8 @@ export const Configuracion = () => {
                         type="text"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm"
+                        disabled={!isFullAccess}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
 
@@ -319,7 +366,8 @@ export const Configuracion = () => {
                         type="text"
                         value={companyPhone}
                         onChange={(e) => setCompanyPhone(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm"
+                        disabled={!isFullAccess}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all bg-white text-slate-900 shadow-sm disabled:bg-slate-50 disabled:text-slate-500"
                       />
                     </div>
 
@@ -327,7 +375,7 @@ export const Configuracion = () => {
                       <label className="text-sm font-medium text-slate-700">Miembro desde</label>
                       <input
                         type="text"
-                        value="15 de Enero de 2024"
+                        value={formatDate(userCreatedAt)}
                         disabled
                         className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
                       />
@@ -337,7 +385,7 @@ export const Configuracion = () => {
                   <div className="pt-4 flex justify-end">
                     <button
                       type="submit"
-                      disabled={!hasCompanyChanges || isSavingCompany}
+                      disabled={!hasCompanyChanges || isSavingCompany || !isFullAccess}
                       className="px-6 py-2.5 bg-slate-900 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800 flex items-center shadow-sm"
                     >
                       {isSavingCompany ? (
@@ -465,7 +513,9 @@ export const Configuracion = () => {
                       <p className="text-slate-400 text-sm">Tu suscripción se renueva el 15 de Octubre de 2026.</p>
                     </div>
                     <div className="mt-4 md:mt-0">
-                      <button className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm">
+                      <button 
+                        disabled={!isFullAccess}
+                        className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                         Gestionar Plan
                       </button>
                     </div>

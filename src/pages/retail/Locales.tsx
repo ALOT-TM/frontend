@@ -5,6 +5,7 @@ import { Plus, Edit2, Trash2, MapPin, Store, AlertTriangle, X, PackageX, Chevron
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
+import { useAuth } from "../../hooks/useAuth";
 
 // Tipos
 interface Local {
@@ -27,6 +28,7 @@ interface AddressDto {
   city: string;
   stateProvince?: string | null;
   postalCode?: string | null;
+  country?: { countryId: number; name: string } | null;
 }
 
 interface RetailCompanyHeadquarterDto {
@@ -115,11 +117,14 @@ const CustomSelect = ({
 };
 
 export const Locales = () => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("Gestionar Locales");
   const [locales, setLocales] = useState<Local[]>([]);
+  const [headquarters, setHeadquarters] = useState<RetailCompanyHeadquarterDto[]>([]);
   const [isSlideOverOpen, setIsSlideOverOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [currentLocal, setCurrentLocal] = useState<Local | null>(null);
-  const [_deleteId, setDeleteId] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [countries, setCountries] = useState<Country[]>([]);
   const [retailCompanyId, setRetailCompanyId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -147,8 +152,9 @@ export const Locales = () => {
         const profile = (profileResponse.data || {}) as ProfileDto;
         setRetailCompanyId(profile.retailCompanyId ?? null);
         setCountries(countriesResponse.data || []);
-        const headquarters = (headquartersResponse.data || []) as RetailCompanyHeadquarterDto[];
-        setLocales(mapHeadquartersToLocales(headquarters, profile.retailCompanyId ?? null));
+        const hqs = (headquartersResponse.data || []) as RetailCompanyHeadquarterDto[];
+        setHeadquarters(hqs);
+        setLocales(mapHeadquartersToLocales(hqs, profile.retailCompanyId ?? null));
       } catch {
         toast.error("No se pudieron cargar los locales.");
       } finally {
@@ -173,15 +179,28 @@ export const Locales = () => {
   const openSlideOver = (local?: Local) => {
     if (local) {
       setCurrentLocal(local);
-      setFormData({ 
-        description: local.name, 
-        street1: local.address, 
-        street2: "", 
-        city: local.city, 
-        stateProvince: "",
-        postalCode: "",
-        countryId: ""
-      });
+      const hq = headquarters.find(h => h.retailCompanyHeadquarterId === local.id);
+      if (hq) {
+        setFormData({ 
+          description: hq.description, 
+          street1: hq.address?.street1 || "", 
+          street2: hq.address?.street2 || "", 
+          city: hq.address?.city || "", 
+          stateProvince: hq.address?.stateProvince || "",
+          postalCode: hq.address?.postalCode || "",
+          countryId: hq.address?.country?.countryId?.toString() || "" 
+        });
+      } else {
+        setFormData({ 
+          description: local.name, 
+          street1: local.address, 
+          street2: "", 
+          city: local.city, 
+          stateProvince: "",
+          postalCode: "",
+          countryId: "" 
+        });
+      }
     } else {
       setCurrentLocal(null);
       setFormData({ 
@@ -204,7 +223,7 @@ export const Locales = () => {
     setIsDeleteModalOpen(true);
   };
 
-  // Acciones (Simuladas)
+  // Acciones
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.countryId) {
@@ -215,8 +234,39 @@ export const Locales = () => {
       toast.error("Empresa no disponible", { description: "No se pudo resolver la empresa actual." });
       return;
     }
+
     if (currentLocal) {
-      toast.error("Edición no disponible", { description: "Aún no existe un endpoint para editar locales." });
+      const hq = headquarters.find(h => h.retailCompanyHeadquarterId === currentLocal.id);
+      if (!hq || !hq.address) {
+        toast.error("Error al editar", { description: "No se encontró la dirección del local." });
+        return;
+      }
+
+      try {
+        const addressPayload = {
+          street1: formData.street1,
+          street2: formData.street2 || null,
+          city: formData.city,
+          stateProvince: formData.stateProvince,
+          postalCode: formData.postalCode || null,
+          countryId: Number(formData.countryId),
+        };
+
+        // 1. Update the address
+        await api.put(`/addresses/${hq.address.addressId}`, addressPayload);
+
+        // 2. Update the headquarter
+        await api.put(`/retail-company-headquarters/${currentLocal.id}`, {
+          description: formData.description,
+          addressId: hq.address.addressId
+        });
+
+        await reloadLocales(retailCompanyId);
+        toast.success(`Local "${formData.description}" actualizado correctamente.`);
+        closeSlideOver();
+      } catch {
+        toast.error("No se pudo actualizar el local.");
+      }
       return;
     }
 
@@ -247,10 +297,18 @@ export const Locales = () => {
     }
   };
 
-  const handleDelete = () => {
-    toast.error("Eliminación no disponible", { description: "Aún no existe un endpoint para eliminar locales." });
-    setIsDeleteModalOpen(false);
-    setDeleteId(null);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await api.delete(`/retail-company-headquarters/${deleteId}`);
+      await reloadLocales(retailCompanyId);
+      toast.success("Local eliminado correctamente.");
+    } catch {
+      toast.error("No se pudo eliminar el local.");
+    } finally {
+      setIsDeleteModalOpen(false);
+      setDeleteId(null);
+    }
   };
 
   const mapHeadquartersToLocales = (
@@ -270,8 +328,9 @@ export const Locales = () => {
 
   const reloadLocales = async (companyId: number | null) => {
     const response = await api.get("/retail-company-headquarters");
-    const headquarters = (response.data || []) as RetailCompanyHeadquarterDto[];
-    setLocales(mapHeadquartersToLocales(headquarters, companyId));
+    const hqs = (response.data || []) as RetailCompanyHeadquarterDto[];
+    setHeadquarters(hqs);
+    setLocales(mapHeadquartersToLocales(hqs, companyId));
   };
 
   return (
@@ -282,13 +341,15 @@ export const Locales = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Mis Locales</h2>
           <p className="text-sm text-slate-500 mt-1">Gestiona la información y estado de tus sucursales.</p>
         </div>
-        <button
-          onClick={() => openSlideOver()}
-          className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          Añadir Nuevo Local
-        </button>
+        {canManage && (
+          <button
+            onClick={() => openSlideOver()}
+            className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Añadir Nuevo Local
+          </button>
+        )}
       </div>
 
       {/* Grid de Tarjetas */}
@@ -332,22 +393,24 @@ export const Locales = () => {
               </div>
               
               {/* Acciones */}
-              <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <button
-                  onClick={() => openSlideOver(local)}
-                  className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                  title="Editar Local"
-                >
-                  <Edit2 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => confirmDelete(local.id)}
-                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Eliminar Local"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
+              {canManage && (
+                <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <button
+                    onClick={() => openSlideOver(local)}
+                    className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                    title="Editar Local"
+                  >
+                    <Edit2 className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(local.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Eliminar Local"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
             </div>
           </motion.div>
         ))}

@@ -64,16 +64,40 @@ export const BuscarDonaciones = () => {
         api.get("/shrinkages/donable"),
         fetchRequestedShrinkageIds()
       ]);
-      const mappedData = response.data.map((item: any) => ({
-        id: Number(unwrapValue(item.shrinkageId)),
-        product: item.name,
-        category: item.category?.name || "Sin Categoría",
-        quantity: item.quantity,
-        retailCompany: item.retailCompany?.name || "Comercio",
-        headquarterName: item.retailCompanyHeadquarter?.name || "Sede",
-        expiryDate: item.expirationDate || "Sin Fecha",
-        alreadyRequested: requestedIds.has(Number(unwrapValue(item.shrinkageId)))
-      }));
+      
+      const shrinkages = response.data || [];
+      
+      // Extract unique headquarter IDs from shrinkages
+      const hqIds: number[] = Array.from(new Set(
+        shrinkages.map((s: any) => s.retailCompanyHeadquarterId).filter(Boolean)
+      ));
+      
+      // Fetch headquarter details in parallel
+      const headquarterMap: Record<number, any> = {};
+      await Promise.all(
+        hqIds.map(async (hqId) => {
+          try {
+            const res = await api.get(`/retail-company-headquarters/${hqId}`);
+            headquarterMap[hqId] = res.data;
+          } catch (err) {
+            console.error(`Error fetching headquarter ${hqId}`, err);
+          }
+        })
+      );
+
+      const mappedData = shrinkages.map((item: any) => {
+        const hq = item.retailCompanyHeadquarterId ? headquarterMap[item.retailCompanyHeadquarterId] : null;
+        return {
+          id: Number(unwrapValue(item.shrinkageId)),
+          product: item.name,
+          category: item.category?.name || "Sin Categoría",
+          quantity: item.quantity,
+          retailCompany: hq?.retailCompany?.name || "Comercio",
+          headquarterName: hq?.description || "Sede",
+          expiryDate: item.expirationDate || "Sin Fecha",
+          alreadyRequested: requestedIds.has(Number(unwrapValue(item.shrinkageId)))
+        };
+      });
       setRequestedShrinkageIds(requestedIds);
       setCatalog(mappedData);
     } catch (err) {

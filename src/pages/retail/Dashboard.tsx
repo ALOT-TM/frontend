@@ -13,6 +13,7 @@ import { DollarSign, Users, Shield, PackageX, HeartHandshake, Calendar, ChevronD
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { toast } from "sonner";
+import { useExcelExport, type ExcelColumn } from "../../hooks/useExcelExport";
 
 // Empty baseline until the backend returns real metrics.
 const defaultTrendData = [
@@ -28,6 +29,8 @@ export const Dashboard = () => {
   const [isDateFilterOpen, setIsDateFilterOpen] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState("Últimos 30 días");
   const filterRef = useRef<HTMLDivElement>(null);
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const { exportToExcel, isExporting } = useExcelExport();
 
   // Real API States
   const [totalShrinkageMonth, setTotalShrinkageMonth] = useState<number>(0);
@@ -50,7 +53,9 @@ export const Dashboard = () => {
   useEffect(() => {
     (async () => {
       try {
-        const response = await api.get("/retail/dashboard/stats");
+        const response = await api.get("/retail/dashboard/stats", {
+          params: { period: selectedDateFilter }
+        });
         const data = response.data;
         if (data) {
           setTotalShrinkageMonth(data.totalShrinkageMonth ?? 0);
@@ -71,27 +76,72 @@ export const Dashboard = () => {
         setChartData(defaultTrendData);
       }
     })();
-  }, []);
+  }, [selectedDateFilter]);
 
   const handleDownloadReport = async () => {
     try {
-      const response = await api.get("/retail/dashboard/report", { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "reporte_gestion.csv");
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      toast.success("Reporte de gestión descargado correctamente.");
-    } catch {
+      const response = await api.get("/retail/dashboard/report", { responseType: "text" });
+      const csvText = response.data;
+      
+      // Parsear CSV básico
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 1) {
+          toast.error("El reporte está vacío.");
+          return;
+      }
+      
+      const headers = lines[0].split(',').map((h: string) => h.trim().replace(/^"|"$/g, ''));
+      const data = lines.slice(1).map((line: string) => {
+        // Separador rudimentario de CSV que soporta comillas simples o sin comillas
+        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
+        const row: Record<string, any> = {};
+        headers.forEach((header: string, index: number) => {
+          let val = values[index]?.trim() || '';
+          if (val.startsWith('"') && val.endsWith('"')) {
+              val = val.substring(1, val.length - 1);
+          }
+          row[header] = val;
+        });
+        return row;
+      });
+
+      const columnsConfig: ExcelColumn<Record<string, any>>[] = headers.map((header: string) => {
+          // Inferir tipo básico
+          let type: 'text' | 'number' | 'currency' | 'date' = 'text';
+          const sample = data[0]?.[header];
+          if (sample) {
+              if (/^\d{4}-\d{2}-\d{2}/.test(sample) || /^\d{2}\/\d{2}\/\d{4}/.test(sample)) {
+                  type = 'date';
+              } else if (/^\$|soles|PEN/i.test(sample) || (/^\d+\.\d{2}$/.test(sample) && (header.toLowerCase().includes('monto') || header.toLowerCase().includes('valor') || header.toLowerCase().includes('precio')))) {
+                  type = 'currency';
+              } else if (/^\d+$/.test(sample) || /^\d+\.\d+$/.test(sample)) {
+                  type = 'number';
+              }
+          }
+          return { header, key: header, type };
+      });
+
+      await exportToExcel({
+        data,
+        columns: columnsConfig,
+        fileName: 'reporte_gestion',
+        sheetName: 'Reporte',
+        dashboardRef: dashboardRef
+      });
+      
+      toast.success("Reporte Excel generado correctamente.");
+    } catch (error) {
+      console.error(error);
       toast.error("No se pudo descargar el reporte.");
     }
   };
 
   const stats = useMemo(() => [
     {
-      name: "Productos Mermados (Mes)",
+      name: selectedDateFilter === "Últimos 7 días" ? "Productos Mermados (7d)" :
+            selectedDateFilter === "Últimos 30 días" ? "Productos Mermados (Mes)" :
+            selectedDateFilter === "Últimos 3 meses" ? "Productos Mermados (3 meses)" :
+            selectedDateFilter === "Este año" ? "Productos Mermados (Año)" : "Productos Mermados (Total)",
       value: totalShrinkageMonth.toLocaleString("es-PE"),
       icon: PackageX,
       color: "text-blue-600",
@@ -125,7 +175,7 @@ export const Dashboard = () => {
       color: "text-amber-600",
       bgColor: "bg-amber-100",
     },
-  ], [totalShrinkageMonth, totalLostValue, donatedTotal, activeUsers, configuredRoles]);
+  ], [totalShrinkageMonth, totalLostValue, donatedTotal, activeUsers, configuredRoles, selectedDateFilter]);
 
   const dateOptions = [
     "Últimos 7 días",
@@ -151,7 +201,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" ref={dashboardRef}>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Resumen de Gestión</h2>
@@ -161,9 +211,10 @@ export const Dashboard = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handleDownloadReport}
-            className="flex items-center bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl px-4 py-2 shadow-sm transition-colors focus:outline-none"
+            disabled={isExporting}
+            className="flex items-center bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl px-4 py-2 shadow-sm transition-colors focus:outline-none disabled:opacity-50"
           >
-            Descargar Reporte
+            {isExporting ? "Generando Excel..." : "Descargar Reporte"}
           </button>
           
           <div className="relative" ref={filterRef}>
@@ -250,7 +301,13 @@ export const Dashboard = () => {
       >
         <div className="mb-6">
           <h3 className="text-lg font-bold text-slate-900">Evolución de Merma vs Donaciones</h3>
-          <p className="text-sm text-slate-500">Histórico de los últimos 6 meses (cantidad de productos).</p>
+          <p className="text-sm text-slate-500">
+            {selectedDateFilter === "Últimos 7 días" && "Histórico de los últimos 7 días (cantidad de productos)."}
+            {selectedDateFilter === "Últimos 30 días" && "Histórico de los últimos 30 días (cantidad de productos)."}
+            {selectedDateFilter === "Últimos 3 meses" && "Histórico de los últimos 3 meses (cantidad de productos)."}
+            {selectedDateFilter === "Este año" && "Evolución mensual durante este año (cantidad de productos)."}
+            {selectedDateFilter === "Todo el tiempo" && "Histórico de los últimos 12 meses (cantidad de productos)."}
+          </p>
         </div>
         <div className="h-[400px] w-full">
           <ResponsiveContainer width="100%" height="100%">

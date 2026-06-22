@@ -19,6 +19,7 @@ import { MisSeguimientos } from "./pages/beneficiary/MisSeguimientos";
 import { ConfiguracionBeneficiario } from "./pages/beneficiary/ConfiguracionBeneficiario";
 import { Toaster } from "sonner";
 import { RoleGuard } from "./components/auth/RoleGuard";
+import { PermissionGuard } from "./components/auth/PermissionGuard";
 import { AccessDenied } from "./pages/auth/AccessDenied";
 
 function App() {
@@ -44,13 +45,23 @@ function App() {
           <Route element={<RoleGuard allowedRoles={["RETAIL"]} />}>
             <Route path="/retail" element={<RetailLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="gestion-merma" element={<GestionMerma />} />
-              <Route path="donaciones" element={<Donaciones />} />
-              <Route path="locales" element={<Locales />} />
+              <Route element={<PermissionGuard permission="Ver Dashboard" />}>
+                <Route path="dashboard" element={<Dashboard />} />
+              </Route>
               
-              {/* Ruta restringida: Solo el MANAGER de retail puede gestionar accesos */}
-              <Route element={<RoleGuard allowedRoles={["RETAIL_MANAGER"]} />}>
+              <Route element={<PermissionGuard permission="Ver Mermas" />}>
+                <Route path="gestion-merma" element={<GestionMerma />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Ver Donaciones" />}>
+                <Route path="donaciones" element={<Donaciones />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Ver Locales" />}>
+                <Route path="locales" element={<Locales />} />
+              </Route>
+              
+              <Route element={<PermissionGuard permission="Ver Usuarios y Roles" />}>
                 <Route path="accesos" element={<Accesos />} />
               </Route>
               

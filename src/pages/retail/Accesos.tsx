@@ -3,13 +3,15 @@ import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, ShieldCheck, Search, Plus, UserPlus, 
-  CheckCircle2, XCircle, Mail, Briefcase, 
+  CheckCircle2, XCircle, Mail, 
   Lock, Key, Edit, Trash2, ChevronDown, Eye, EyeOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 
 import { api } from "../../services/api";
+
+
 import { useAuth } from "../../hooks/useAuth";
 
 // --- Tipos ---
@@ -33,7 +35,9 @@ interface Role {
 }
 
 export const Accesos = () => {
-  const { isManager } = useAuth();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission("Gestionar Usuarios y Roles");
+
   const [activeTab, setActiveTab] = useState<"usuarios" | "roles">("usuarios");
 
   // State - Usuarios
@@ -54,6 +58,7 @@ export const Accesos = () => {
 
   // State - Roles
   const [roles, setRoles] = useState<Role[]>([]);
+  const [fullAccessRoleId, setFullAccessRoleId] = useState<string | null>(null);
 
   // Modals State
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -66,24 +71,34 @@ export const Accesos = () => {
 
   // Permissions List
   const availablePermissions = [
-    { id: "p1", name: "Dashboard", desc: "Métricas y resumen general" },
-    { id: "p2", name: "Merma", desc: "Declarar y revisar mermas" },
-    { id: "p3", name: "Donaciones", desc: "Aprobar donaciones y peticiones" },
-    { id: "p4", name: "Locales", desc: "Crear y editar sucursales" },
-    { id: "p5", name: "Usuarios y Roles", desc: "Administración de usuarios y roles" }
+    { id: "p1", name: "Ver Dashboard", desc: "Permite ver las métricas y resumen general" },
+    { id: "p2", name: "Ver Mermas", desc: "Permite ver el listado y reportes de mermas" },
+    { id: "p3", name: "Registrar Merma", desc: "Permite declarar, editar y eliminar registros de merma" },
+    { id: "p4", name: "Ver Donaciones", desc: "Permite ver las solicitudes de donación e historial" },
+    { id: "p5", name: "Gestionar Donaciones", desc: "Permite aprobar, rechazar o cambiar estados de donación" },
+    { id: "p6", name: "Ver Locales", desc: "Permite ver las sucursales de la empresa" },
+    { id: "p7", name: "Gestionar Locales", desc: "Permite agregar, editar y eliminar sucursales" },
+    { id: "p8", name: "Ver Usuarios y Roles", desc: "Permite ver usuarios, sus roles y permisos" },
+    { id: "p9", name: "Gestionar Usuarios y Roles", desc: "Permite crear/editar/eliminar usuarios y roles" }
   ];
 
   const fetchRoles = async () => {
     try {
       const response = await api.get("/auth/roles");
-      const mappedRoles = response.data.map((r: any) => ({
-        id: r.roleId.toString(),
-        name: r.name,
-        description: "Rol en la empresa",
-        userCount: 0,
-        permissions: ["Todo el sistema"],
-        isCustom: true
-      }));
+      const fullAccessRole = response.data.find((r: any) => r.name === "RETAIL_FULL_ACCESS");
+      if (fullAccessRole) {
+        setFullAccessRoleId(fullAccessRole.roleId.toString());
+      }
+      const mappedRoles = response.data
+        .filter((r: any) => r.name !== "RETAIL_FULL_ACCESS")
+        .map((r: any) => ({
+          id: r.roleId.toString(),
+          name: r.name,
+          description: "Rol en la empresa",
+          userCount: r.userCount || 0,
+          permissions: r.permissions && r.permissions.length > 0 ? r.permissions : ["Todo el sistema"],
+          isCustom: true
+        }));
       setRoles(mappedRoles);
     } catch (err) {
       console.error("Error fetching roles", err);
@@ -150,6 +165,7 @@ export const Accesos = () => {
       });
       toast.success("Rol del trabajador actualizado dinámicamente.");
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al actualizar el rol.");
     }
@@ -170,6 +186,7 @@ export const Accesos = () => {
       await api.delete(`/auth/retail-users/${id}`);
       toast.success("Usuario eliminado del sistema.");
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error("Error al eliminar usuario");
     }
@@ -198,12 +215,17 @@ export const Accesos = () => {
   };
 
   const handleDeleteRole = async (id: string) => {
+    const role = roles.find(r => r.id === id);
+    if (role && role.userCount > 0) {
+      toast.error("No se puede eliminar el rol porque está asignado a uno o más usuarios.");
+      return;
+    }
     try {
       await api.delete(`/auth/roles/${id}`);
       toast.success("Rol eliminado del sistema.");
       fetchRoles();
     } catch (err: any) {
-      toast.error("Error al eliminar rol");
+      toast.error(err.response?.data?.message || "Error al eliminar rol");
     }
   };
 
@@ -247,6 +269,7 @@ export const Accesos = () => {
       setShowPassword(false);
       setShowConfirmPassword(false);
       fetchUsers();
+      fetchRoles();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Error al guardar usuario");
     }
@@ -258,14 +281,18 @@ export const Accesos = () => {
       return;
     }
     try {
+      const permissionNames = selectedPermissions.map(id => availablePermissions.find(p => p.id === id)?.name).filter(Boolean);
+      
       if (editingRoleId) {
         await api.put(`/auth/roles/${editingRoleId}`, {
-          name: roleForm.name
+          name: roleForm.name,
+          permissions: permissionNames
         });
         toast.success("Rol actualizado exitosamente.");
       } else {
         await api.post("/auth/roles", {
-          name: roleForm.name
+          name: roleForm.name,
+          permissions: permissionNames
         });
         toast.success("Rol creado exitosamente.");
       }
@@ -398,7 +425,7 @@ export const Accesos = () => {
                   </AnimatePresence>
                 </div>
               </div>
-              {isManager && (
+              {canManage && (
                 <button 
                   onClick={() => setIsUserModalOpen(true)}
                   className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center shrink-0"
@@ -418,7 +445,7 @@ export const Accesos = () => {
                       <th className="p-4 font-semibold">Rol</th>
                       <th className="p-4 font-semibold">Estado</th>
                       <th className="p-4 font-semibold">Último Acceso</th>
-                      <th className="p-4 font-semibold text-right rounded-tr-2xl">Acciones</th>
+                      {canManage && <th className="p-4 font-semibold text-right rounded-tr-2xl">Acciones</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -446,8 +473,16 @@ export const Accesos = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            {isManager ? (
-                              <div className="relative inline-block w-48">
+                            <div className="relative inline-block w-48">
+                              {fullAccessRoleId && user.role === fullAccessRoleId ? (
+                                <span className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  RETAIL_FULL_ACCESS (Admin)
+                                </span>
+                              ) : !canManage ? (
+                                <span className="text-xs font-semibold text-slate-600">
+                                  {roles.find(r => r.id === user.role)?.name || "Sin Rol"}
+                                </span>
+                              ) : (
                                 <select
                                   value={user.role}
                                   onChange={(e) => handleQuickRoleChange(user.id, e.target.value)}
@@ -459,13 +494,8 @@ export const Accesos = () => {
                                     </option>
                                   ))}
                                 </select>
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
-                                <Briefcase className="w-3 h-3 mr-1" />
-                                {getRoleName(user.role)}
-                              </span>
-                            )}
+                              )}
+                            </div>
                           </td>
                           <td className="p-4">
                             <span className={cn(
@@ -484,8 +514,8 @@ export const Accesos = () => {
                           <td className="p-4 text-sm text-slate-500">
                             {user.lastLogin}
                           </td>
-                          <td className="p-4">
-                            {isManager ? (
+                          {canManage && (
+                            <td className="p-4">
                               <div className="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => handleToggleUserStatus(user.id)}
@@ -509,16 +539,14 @@ export const Accesos = () => {
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">-</span>
-                            )}
-                          </td>
+                            </td>
+                          )}
                         </motion.tr>
                       ))}
                     </AnimatePresence>
                     {filteredUsers.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-500">
+                        <td colSpan={canManage ? 5 : 4} className="p-8 text-center text-slate-500">
                           No se encontraron usuarios.
                         </td>
                       </tr>
@@ -540,15 +568,17 @@ export const Accesos = () => {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            <div className="flex justify-end items-center mb-6">
-              <button 
-                onClick={() => setIsRoleModalOpen(true)}
-                className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Crear Nuevo Rol
-              </button>
-            </div>
+            {canManage && (
+              <div className="flex justify-end items-center mb-6">
+                <button 
+                  onClick={() => setIsRoleModalOpen(true)}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl transition-all shadow-sm flex items-center justify-center"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Crear Nuevo Rol
+                </button>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnimatePresence>
@@ -618,22 +648,24 @@ export const Accesos = () => {
                         <Users className="w-4 h-4 mr-1.5 text-slate-400" />
                         {role.userCount} {role.userCount === 1 ? 'Usuario' : 'Usuarios'}
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <button 
-                          onClick={() => handleEditRole(role)}
-                          className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteRole(role.id)}
-                          className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Eliminar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {canManage && (
+                        <div className="flex items-center space-x-1">
+                          <button 
+                            onClick={() => handleEditRole(role)}
+                            className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteRole(role.id)}
+                            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -743,16 +775,23 @@ export const Accesos = () => {
                       <label className="text-sm font-semibold text-slate-700 block mb-1.5">Rol *</label>
                       <button
                         type="button"
+                        disabled={fullAccessRoleId !== null && userForm.role === fullAccessRoleId}
                         onClick={() => setIsFormRoleOpen(!isFormRoleOpen)}
                         className={cn(
                           "flex items-center justify-between w-full px-4 py-2 bg-white border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors",
-                          isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
+                          fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                            ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
+                            : isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
                         )}
                       >
                         <span className={cn("truncate", !userForm.role && "text-slate-500")}>
-                          {userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
+                          {fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                            ? "RETAIL_FULL_ACCESS"
+                            : userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
                         </span>
-                        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
+                        {!(fullAccessRoleId !== null && userForm.role === fullAccessRoleId) && (
+                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
+                        )}
                       </button>
 
                       <AnimatePresence>

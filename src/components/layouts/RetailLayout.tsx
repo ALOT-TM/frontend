@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { Link, useLocation, Outlet, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +17,22 @@ import {
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import logoUrl from "../../assets/fluxuspng.png";
+import { useAuth } from "../../hooks/useAuth";
+
+interface RetailLayoutContextType {
+  setCompanyName: (name: string | null) => void;
+  setUsername: (name: string | null) => void;
+}
+
+export const RetailLayoutContext = createContext<RetailLayoutContextType | null>(null);
+
+export const useRetailLayout = () => {
+  const context = useContext(RetailLayoutContext);
+  if (!context) {
+    throw new Error("useRetailLayout must be used within a RetailLayoutContext.Provider");
+  }
+  return context;
+};
 
 export const RetailLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -25,15 +41,17 @@ export const RetailLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { hasPermission } = useAuth();
+  
   const navLinks = [
-    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard },
-    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle },
-    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake },
-    { name: "Locales", path: "/retail/locales", icon: Store },
-    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users },
+    { name: "Dashboard", path: "/retail/dashboard", icon: LayoutDashboard, permission: "Ver Dashboard" },
+    { name: "Merma", path: "/retail/gestion-merma", icon: Recycle, permission: "Ver Mermas" },
+    { name: "Donaciones", path: "/retail/donaciones", icon: HeartHandshake, permission: "Ver Donaciones" },
+    { name: "Locales", path: "/retail/locales", icon: Store, permission: "Ver Locales" },
+    { name: "Usuarios y Roles", path: "/retail/accesos", icon: Users, permission: "Ver Usuarios y Roles" },
     { name: "Historial", path: "/retail/historial", icon: History },
     { name: "Configuración", path: "/retail/configuracion", icon: Settings },
-  ];
+  ].filter(link => !link.permission || hasPermission(link.permission));
 
   useEffect(() => {
     (async () => {
@@ -72,7 +90,8 @@ export const RetailLayout = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
+    <RetailLayoutContext.Provider value={{ setCompanyName, setUsername }}>
+      <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
@@ -212,5 +231,6 @@ export const RetailLayout = () => {
         </main>
       </div>
     </div>
+    </RetailLayoutContext.Provider>
   );
 };

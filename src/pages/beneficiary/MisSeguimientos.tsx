@@ -7,7 +7,7 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 
 type ChildStatus = "Solicitado" | "En Proceso" | "Rechazado" | "Recogido";
-type ParentStatus = "En Proceso" | "Completada";
+type ParentStatus = "En Proceso" | "Completada" | "Rechazada";
 
 interface ChildItem {
   id: number;
@@ -34,7 +34,8 @@ const StatusBadge = ({ status }: { status: ChildStatus | ParentStatus }) => {
     case "En Proceso":
       return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-600 text-xs font-semibold rounded-lg border border-amber-200"><AlertCircle className="w-3.5 h-3.5" /> En Proceso</span>;
     case "Rechazado":
-      return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 text-xs font-semibold rounded-lg border border-red-200"><XCircle className="w-3.5 h-3.5" /> Rechazado</span>;
+    case "Rechazada":
+      return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-600 text-xs font-semibold rounded-lg border border-red-200"><XCircle className="w-3.5 h-3.5" /> {status}</span>;
     case "Recogido":
     case "Completada":
       return <span className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 text-cyan-600 text-xs font-semibold rounded-lg border border-cyan-200"><CheckCircle2 className="w-3.5 h-3.5" /> {status}</span>;
@@ -51,6 +52,7 @@ export const MisSeguimientos = () => {
   // Modal State for Confirmation Form
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmingDonationId, setConfirmingDonationId] = useState<number | null>(null);
+  const [confirmingType, setConfirmingType] = useState<"request" | "donation" | null>(null);
   const [receptionDate, setReceptionDate] = useState(new Date().toISOString().split("T")[0]);
   const [comment, setComment] = useState("");
   const [isSubmittingConfirm, setIsSubmittingConfirm] = useState(false);
@@ -66,6 +68,11 @@ export const MisSeguimientos = () => {
     } catch {
       return null;
     }
+  };
+
+  const unwrapValue = (field: any) => {
+    if (!field) return null;
+    return typeof field === "object" ? field.value : field;
   };
 
   const fetchFollowUps = async () => {
@@ -88,13 +95,13 @@ export const MisSeguimientos = () => {
         api.get(`/donations/by-beneficiary/${beneficiaryId}`)
       ]);
 
-      const requestsData = requestsRes.data || [];
-      const donationsData = donationsRes.data || [];
+      const requestsData = Array.isArray(requestsRes.data) ? requestsRes.data : [];
+      const donationsData = Array.isArray(donationsRes.data) ? donationsRes.data : [];
 
-      // Extract unique shrinkage IDs
+      // Extract unique shrinkage IDs using unwrapValue
       const shrinkageIds: number[] = Array.from(new Set([
-        ...requestsData.map((r: any) => r.shrinkageReferenceId?.value).filter(Boolean),
-        ...donationsData.map((d: any) => d.shrinkageReferenceId?.value).filter(Boolean)
+        ...requestsData.map((r: any) => Number(unwrapValue(r.shrinkageReferenceId))).filter(Boolean),
+        ...donationsData.map((d: any) => Number(unwrapValue(d.shrinkageReferenceId))).filter(Boolean)
       ]));
 
       // Fetch all shrinkages details in parallel
@@ -110,23 +117,54 @@ export const MisSeguimientos = () => {
         })
       );
 
+      // Extract unique headquarter IDs from loaded shrinkages
+      const hqIds: number[] = Array.from(new Set(
+        Object.values(shrinkageMap)
+          .map((s: any) => s?.retailCompanyHeadquarterId)
+          .filter(Boolean)
+      ));
+
+      // Fetch all headquarters details in parallel
+      const headquarterMap: Record<number, any> = {};
+      await Promise.all(
+        hqIds.map(async (hqId) => {
+          try {
+            const res = await api.get(`/retail-company-headquarters/${hqId}`);
+            headquarterMap[hqId] = res.data;
+          } catch (err) {
+            console.error(`Error fetching headquarter ${hqId}`, err);
+          }
+        })
+      );
+
       const mappedRequests: ParentDonation[] = requestsData.map((req: any) => {
-        const shrinkage = shrinkageMap[req.shrinkageReferenceId?.value];
+        const shrId = Number(unwrapValue(req.shrinkageReferenceId));
+        const shrinkage = shrinkageMap[shrId];
+        const hqId = shrinkage?.retailCompanyHeadquarterId;
+        const headquarter = hqId ? headquarterMap[hqId] : null;
+
         const dateObj = req.createdAt ? new Date(req.createdAt) : new Date();
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
         
         let displayStatus: ChildStatus = "Solicitado";
+        let parentStatus: ParentStatus = "En Proceso";
         if (req.status === "ACCEPTED") displayStatus = "En Proceso";
-        else if (req.status === "REJECTED") displayStatus = "Rechazado";
-        else if (req.status === "CANCELLED") displayStatus = "Rechazado";
+        else if (req.status === "COMPLETED") {
+          displayStatus = "Recogido";
+          parentStatus = "Completada";
+        }
+        else if (req.status === "REJECTED" || req.status === "CANCELLED") {
+          displayStatus = "Rechazado";
+          parentStatus = "Rechazada";
+        }
 
         return {
           id: `PET-${req.donationRequestId?.value || req.id}`,
           realId: req.donationRequestId?.value || req.id,
           type: "request",
           date: formattedDate,
-          headquarterName: shrinkage?.retailCompanyHeadquarter?.name || "Sede Desconocida",
-          status: "En Proceso" as ParentStatus,
+          headquarterName: headquarter?.description || "Sede Desconocida",
+          status: parentStatus,
           items: [{
             id: req.id,
             product: shrinkage?.name || "Cargando...",
@@ -138,20 +176,31 @@ export const MisSeguimientos = () => {
       });
 
       const mappedDonations: ParentDonation[] = donationsData.map((don: any) => {
-        const shrinkage = shrinkageMap[don.shrinkageReferenceId?.value];
+        const shrId = Number(unwrapValue(don.shrinkageReferenceId));
+        const shrinkage = shrinkageMap[shrId];
+        const hqId = shrinkage?.retailCompanyHeadquarterId;
+        const headquarter = hqId ? headquarterMap[hqId] : null;
+
         const dateObj = don.createdAt ? new Date(don.createdAt) : new Date();
         const formattedDate = dateObj.toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
 
         let displayStatus: ChildStatus = "En Proceso";
-        if (don.status === "CONFIRMED") displayStatus = "Recogido";
+        let parentStatus: ParentStatus = "En Proceso";
+        if (don.status === "CONFIRMED" || don.status === "PICKED_UP" || don.status === "DONATED") {
+          displayStatus = "Recogido";
+          parentStatus = "Completada";
+        } else if (don.status === "REJECTED" || don.status === "CANCELLED") {
+          displayStatus = "Rechazado";
+          parentStatus = "Rechazada";
+        }
 
         return {
           id: `DON-${don.donationId?.value || don.id}`,
           realId: don.donationId?.value || don.id,
           type: "donation",
           date: formattedDate,
-          headquarterName: shrinkage?.retailCompanyHeadquarter?.name || "Sede Desconocida",
-          status: don.status === "CONFIRMED" ? "Completada" as ParentStatus : "En Proceso" as ParentStatus,
+          headquarterName: headquarter?.description || "Sede Desconocida",
+          status: parentStatus,
           items: [{
             id: don.id,
             product: shrinkage?.name || "Cargando...",
@@ -183,27 +232,34 @@ export const MisSeguimientos = () => {
     setExpandedId(expandedId === id ? null : id);
   };
 
-  const handleMarkAsRecogidoClick = (realId: number) => {
+  const handleMarkAsRecogidoClick = (realId: number, type: "request" | "donation") => {
     setConfirmingDonationId(realId);
+    setConfirmingType(type);
     setConfirmModalOpen(true);
   };
 
   const handleConfirmReception = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!confirmingDonationId) return;
+    if (!confirmingDonationId || !confirmingType) return;
     setIsSubmittingConfirm(true);
     try {
-      await api.patch(`/donations/${confirmingDonationId}/confirm`, {
+      const endpoint = confirmingType === "request"
+        ? `/requests/${confirmingDonationId}/confirm`
+        : `/donations/${confirmingDonationId}/confirm`;
+
+      await api.patch(endpoint, {
         receptionDate: receptionDate,
         comment: comment || "Entrega realizada satisfactoriamente"
       });
-      toast.success("¡Donación confirmada como recogida!");
+      toast.success(confirmingType === "request" ? "¡Solicitud confirmada como recogida!" : "¡Donación confirmada como recogida!");
       setConfirmModalOpen(false);
       setConfirmingDonationId(null);
+      setConfirmingType(null);
       setComment("");
       fetchFollowUps();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Error al confirmar la recepción");
+      const msg = err.response?.data || "Error al confirmar la recepción";
+      toast.error(`Error: ${msg}`);
     } finally {
       setIsSubmittingConfirm(false);
     }
@@ -238,7 +294,7 @@ export const MisSeguimientos = () => {
                   key={donation.id}
                   className={cn(
                     "bg-white rounded-2xl border transition-all shadow-sm overflow-hidden",
-                    isCompleted ? "border-cyan-200" : "border-amber-200"
+                    isCompleted ? "border-cyan-200" : donation.status === "Rechazada" ? "border-red-200" : "border-amber-200"
                   )}
                 >
                   {/* Parent Header */}
@@ -246,13 +302,13 @@ export const MisSeguimientos = () => {
                     onClick={() => toggleExpand(donation.id)}
                     className={cn(
                       "p-5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-slate-50/50",
-                      isCompleted ? "bg-cyan-50/30" : "bg-amber-50/30"
+                      isCompleted ? "bg-cyan-50/30" : donation.status === "Rechazada" ? "bg-red-50/30" : "bg-amber-50/30"
                     )}
                   >
                     <div className="flex items-start gap-4">
                       <div className={cn(
                         "p-3 rounded-xl flex-shrink-0",
-                        isCompleted ? "bg-cyan-100 text-cyan-600" : "bg-amber-100 text-amber-600"
+                        isCompleted ? "bg-cyan-100 text-cyan-600" : donation.status === "Rechazada" ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"
                       )}>
                         <Package className="w-6 h-6" />
                       </div>
@@ -301,9 +357,9 @@ export const MisSeguimientos = () => {
                                 <div className="flex items-center gap-4 justify-between sm:justify-end border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
                                   <StatusBadge status={item.status} />
                                   
-                                  {donation.type === "donation" && item.status === "En Proceso" && (
+                                  {item.status === "En Proceso" && (
                                     <button
-                                      onClick={() => handleMarkAsRecogidoClick(donation.realId)}
+                                      onClick={() => handleMarkAsRecogidoClick(donation.realId, donation.type)}
                                       className="px-3 py-1.5 bg-white border border-cyan-200 text-cyan-600 hover:bg-cyan-50 text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
                                     >
                                       <CheckCircle2 className="w-3.5 h-3.5" /> Marcar como Recogido

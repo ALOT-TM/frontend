@@ -10,7 +10,8 @@ import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 
-type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente";
+
+type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente" | "En Proceso" | "Donado";
 
 interface MermaItem {
   id: number;
@@ -31,7 +32,7 @@ interface MermaItem {
 
 interface MermaFormData {
   product: string;
-  quantity: number;
+  quantity: number | "";
   expiryDate: string;
   reasonId: number | "";
   customReason: string;
@@ -75,6 +76,8 @@ const StatusBadge = ({ status }: { status: MermaStatus }) => {
     "No Donable": "bg-red-100 text-red-700 border-red-200",
     "Solicitado": "bg-amber-100 text-amber-700 border-amber-200",
     "Pendiente": "bg-slate-100 text-slate-700 border-slate-200",
+    "En Proceso": "bg-blue-100 text-blue-700 border-blue-200",
+    "Donado": "bg-purple-100 text-purple-700 border-purple-200",
   };
 
   return (
@@ -169,7 +172,9 @@ const CustomSelect = ({
 };
 
 export const GestionMerma = () => {
-  const { isAuditor } = useAuth();
+  const { hasPermission } = useAuth();
+  const canRegister = hasPermission("Registrar Merma");
+
   // State
   const [items, setItems] = useState<MermaItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -202,9 +207,11 @@ export const GestionMerma = () => {
       case "NOT_DONABLE":
         return "No Donable";
       case "REQUESTED":
+        return "Donable";
       case "IN_PROCESS":
+        return "En Proceso";
       case "DONATED":
-        return "Solicitado";
+        return "Donado";
       case "NONE":
         return "Pendiente";
       default:
@@ -361,6 +368,10 @@ export const GestionMerma = () => {
       toast.error("Selecciona una razón", { description: "Por favor, especifica por qué se está enviando este producto a merma.", id: "merma-reason" });
       return;
     }
+    if (formData.quantity === "" || formData.quantity <= 0) {
+      toast.error("Cantidad no válida", { description: "Por favor, ingresa una cantidad mayor a 0.", id: "merma-quantity" });
+      return;
+    }
     if (formData.shrinkageValue === "" || formData.shrinkageValue < 0) {
       toast.error("Valor unitario no válido", { description: "Por favor, ingresa un valor unitario no negativo.", id: "merma-value" });
       return;
@@ -376,7 +387,7 @@ export const GestionMerma = () => {
         categoryId: formData.categoryId,
         shrinkageReasonId: formData.reasonId,
         name: formData.product,
-        quantity: formData.quantity,
+        quantity: Number(formData.quantity),
         expirationDate: formData.expiryDate || null,
         specificReason: selectedReason?.name === "Otro" ? formData.customReason.trim() : null,
         pickupDate: null,
@@ -415,7 +426,7 @@ export const GestionMerma = () => {
           <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Gestión de Merma</h2>
           <p className="text-sm text-slate-500 mt-1">Inventario detallado de productos mermados y su estado.</p>
         </div>
-        {!isAuditor && (
+        {canRegister && (
           <button
             onClick={() => handleOpenModal()}
             className="flex items-center px-4 py-2 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95"
@@ -466,7 +477,7 @@ export const GestionMerma = () => {
                 transition={{ duration: 0.15 }}
                 className="absolute left-0 right-0 xl:right-auto xl:w-48 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
               >
-                {["Todos", "Pendiente", "Donable", "No Donable", "Solicitado"].map((status) => (
+                {["Todos", "Pendiente", "Donable", "No Donable", "En Proceso", "Donado"].map((status) => (
                   <button
                     key={status}
                     onClick={() => {
@@ -548,7 +559,7 @@ export const GestionMerma = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center h-8">
                         <AnimatePresence mode="wait">
-                          {item.status !== "Pendiente" || isAuditor ? (
+                          {item.status !== "Pendiente" || !canRegister ? (
                             <motion.div
                               key="badge"
                               initial={{ opacity: 0, scale: 0.8 }}
@@ -691,9 +702,11 @@ export const GestionMerma = () => {
                       <input
                         required
                         type="number"
-                        min="1"
                         value={formData.quantity}
-                        onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, quantity: val === "" ? "" : parseInt(val) });
+                        }}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                       />
                     </div>
