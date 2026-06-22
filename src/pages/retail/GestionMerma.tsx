@@ -32,7 +32,7 @@ interface MermaItem {
 
 interface MermaFormData {
   product: string;
-  quantity: number;
+  quantity: number | "";
   expiryDate: string;
   reasonId: number | "";
   customReason: string;
@@ -368,6 +368,10 @@ export const GestionMerma = () => {
       toast.error("Selecciona una razón", { description: "Por favor, especifica por qué se está enviando este producto a merma.", id: "merma-reason" });
       return;
     }
+    if (formData.quantity === "" || formData.quantity <= 0) {
+      toast.error("Cantidad no válida", { description: "Por favor, ingresa una cantidad mayor a 0.", id: "merma-quantity" });
+      return;
+    }
     if (formData.shrinkageValue === "" || formData.shrinkageValue < 0) {
       toast.error("Valor unitario no válido", { description: "Por favor, ingresa un valor unitario no negativo.", id: "merma-value" });
       return;
@@ -383,7 +387,7 @@ export const GestionMerma = () => {
         categoryId: formData.categoryId,
         shrinkageReasonId: formData.reasonId,
         name: formData.product,
-        quantity: formData.quantity,
+        quantity: Number(formData.quantity),
         expirationDate: formData.expiryDate || null,
         specificReason: selectedReason?.name === "Otro" ? formData.customReason.trim() : null,
         pickupDate: null,
@@ -698,9 +702,11 @@ export const GestionMerma = () => {
                       <input
                         required
                         type="number"
-                        min="1"
                         value={formData.quantity}
-                        onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setFormData({ ...formData, quantity: val === "" ? "" : parseInt(val) });
+                        }}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                       />
                     </div>
