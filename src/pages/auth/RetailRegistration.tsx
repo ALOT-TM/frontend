@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Check, CreditCard, Lock, Building2, User, Mail, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, CreditCard, Lock, Building2, User, Mail, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { isAxiosError } from "axios";
 import { cn } from "../../utils/cn";
@@ -31,6 +31,21 @@ export const RetailRegistration = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  // Card states for Stripe simulation
+  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
+  const [cardExpiry, setCardExpiry] = useState("12/26");
+  const [cardCvc, setCardCvc] = useState("123");
+  const [cardName, setCardName] = useState("Retail Solutions");
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const getPaymentMethodId = (num: string): string => {
+    const cleanNumber = num.replace(/\s+/g, "");
+    if (cleanNumber === "4242424242424242") return "pm_card_visa";
+    if (cleanNumber === "4000000000000002") return "pm_card_chargeDeclined";
+    if (cleanNumber === "4000000000000023") return "pm_card_chargeDeclinedExpiredCard";
+    return "pm_invalid_card_format";
+  };
 
   useEffect(() => {
     if (!plan) {
@@ -66,6 +81,7 @@ export const RetailRegistration = () => {
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setPaymentError(null);
     try {
       const companyResponse = await api.post("/retail-companies", {
         name: companyName,
@@ -77,7 +93,8 @@ export const RetailRegistration = () => {
       }
 
       // Vincular la compañía con el plan seleccionado creando la suscripción
-      await planService.startSubscription(companyId, plan.id);
+      const paymentMethodId = getPaymentMethodId(cardNumber);
+      await planService.startSubscription(companyId, plan.id, paymentMethodId);
 
       await api.post("/auth/register", {
         email,
@@ -92,13 +109,19 @@ export const RetailRegistration = () => {
       navigate("/login");
     } catch (error) {
       if (isAxiosError(error) && error.response) {
+        const errMsg = error.response.data?.message || 
+                       (typeof error.response.data === "string" ? error.response.data : null) || 
+                       "No se pudo completar el registro. Revisa los datos.";
+        setPaymentError(errMsg);
         toast.error("Error en el registro", {
-          description: error.response.data?.message || "No se pudo completar el registro. Revisa los datos.",
+          description: errMsg,
           id: "reg-api",
         });
       } else {
+        const errMsg = "No se pudo conectar con el servidor. Inténtalo más tarde.";
+        setPaymentError(errMsg);
         toast.error("Error de conexión", {
-          description: "No se pudo conectar con el servidor. Inténtalo más tarde.",
+          description: errMsg,
           id: "reg-api",
         });
       }
@@ -277,6 +300,16 @@ export const RetailRegistration = () => {
                   </p>
                 </div>
 
+                {paymentError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3 text-red-700 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-bold text-red-800">Error de pago</p>
+                      <p className="text-red-700 mt-0.5 whitespace-pre-line">{paymentError}</p>
+                    </div>
+                  </div>
+                )}
+
                 <form onSubmit={handleCheckoutSubmit} className="space-y-6 flex-1">
                   
                   <div className="space-y-4">
@@ -287,7 +320,11 @@ export const RetailRegistration = () => {
                         <input
                           type="text"
                           required
-                          defaultValue="4242 4242 4242 4242"
+                          value={cardNumber}
+                          onChange={(e) => {
+                            setCardNumber(e.target.value);
+                            setPaymentError(null);
+                          }}
                           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-t-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                           placeholder="Número de Tarjeta"
                         />
@@ -296,14 +333,22 @@ export const RetailRegistration = () => {
                         <input
                           type="text"
                           required
-                          defaultValue="12/26"
+                          value={cardExpiry}
+                          onChange={(e) => {
+                            setCardExpiry(e.target.value);
+                            setPaymentError(null);
+                          }}
                           className="w-1/2 px-4 py-2.5 bg-white border border-slate-200 rounded-bl-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm focus:z-10 relative"
                           placeholder="MM/AA"
                         />
                         <input
                           type="text"
                           required
-                          defaultValue="123"
+                          value={cardCvc}
+                          onChange={(e) => {
+                            setCardCvc(e.target.value);
+                            setPaymentError(null);
+                          }}
                           className="w-1/2 px-4 py-2.5 bg-white border border-slate-200 -ml-px rounded-br-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm focus:z-10 relative"
                           placeholder="CVC"
                         />
@@ -315,7 +360,11 @@ export const RetailRegistration = () => {
                       <input
                         type="text"
                         required
-                        defaultValue="Retail Solutions"
+                        value={cardName}
+                        onChange={(e) => {
+                          setCardName(e.target.value);
+                          setPaymentError(null);
+                        }}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                         placeholder="Nombre en la tarjeta"
                       />

@@ -70,4 +70,16 @@ export default defineConfig([
     },
   },
 ])
-```
+
+## Stripe Integration & Card Verification (Simulated)
+
+The subscription process requires Stripe card verification.
+
+### Environment Variables
+- **`StripeSecretKey`**: The system environment variable used by the Java backend (`subscription-service`) to authenticate with Stripe. You must set this variable before running the microservices.
+
+### Testing Credit Cards
+For testing the validation flow in the development environment, use the following test cards:
+- **Successful Validation**: `4242 4242 4242 4242` (any future expiry date and CVC)
+- **Declined Card**: `4000 0000 0000 0002` (will trigger a card declined error)
+- **Expired Card**: `4000 0000 0000 0023` (will trigger an expired card error)

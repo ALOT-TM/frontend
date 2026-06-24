@@ -14,10 +14,11 @@ export const planService = {
     return response.data;
   },
 
-  startSubscription: async (retailCompanyId: number, planId: number): Promise<any> => {
+  startSubscription: async (retailCompanyId: number, planId: number, paymentMethodId: string): Promise<any> => {
     const response = await api.post("/subscriptions", {
       retailCompanyId,
-      planId
+      planId,
+      paymentMethodId
     });
     return response.data;
   }
