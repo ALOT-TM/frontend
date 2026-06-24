@@ -109,7 +109,9 @@ export const RetailRegistration = () => {
       navigate("/login");
     } catch (error) {
       if (isAxiosError(error) && error.response) {
-        const errMsg = error.response.data?.message || "No se pudo completar el registro. Revisa los datos.";
+        const errMsg = error.response.data?.message || 
+                       (typeof error.response.data === "string" ? error.response.data : null) || 
+                       "No se pudo completar el registro. Revisa los datos.";
         setPaymentError(errMsg);
         toast.error("Error en el registro", {
           description: errMsg,
@@ -303,7 +305,7 @@ export const RetailRegistration = () => {
                     <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p className="font-bold text-red-800">Error de pago</p>
-                      <p className="text-red-700 mt-0.5">{paymentError}</p>
+                      <p className="text-red-700 mt-0.5 whitespace-pre-line">{paymentError}</p>
                     </div>
                   </div>
                 )}
