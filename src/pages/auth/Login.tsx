@@ -99,6 +99,15 @@ export const Login = () => {
               )}
               placeholder="••••••••"
             />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
           </div>
 
           <button

@@ -4,6 +4,8 @@ import { RegisterSelection } from "./pages/auth/RegisterSelection";
 import { RetailPricing } from "./pages/auth/RetailPricing";
 import { RetailRegistration } from "./pages/auth/RetailRegistration";
 import { BeneficiaryForm } from "./pages/auth/BeneficiaryForm";
+import { ForgotPassword } from "./pages/auth/ForgotPassword";
+import { ResetPassword } from "./pages/auth/ResetPassword";
 import { RetailLayout } from "./components/layouts/RetailLayout";
 import { AuthLayout } from "./components/layouts/AuthLayout";
 import { Dashboard } from "./pages/retail/Dashboard";
@@ -36,6 +38,8 @@ function App() {
             <Route path="/register/retail" element={<RetailPricing />} />
             <Route path="/register/retail/checkout" element={<RetailRegistration />} />
             <Route path="/register/beneficiary" element={<BeneficiaryForm />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
           </Route>
           
           {/* Vista de Acceso Denegado (403 Forbidden) */}
