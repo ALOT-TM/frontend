@@ -402,7 +402,24 @@ export const GestionMerma = () => {
     }
   };
 
+  const isExpired = (expiryDateStr: string | null) => {
+    if (!expiryDateStr || expiryDateStr === "-") return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(expiryDateStr + "T00:00:00");
+    return expiry <= today;
+  };
+
   const quickChangeStatus = async (id: number, newStatus: MermaStatus) => {
+    if (newStatus === "Donable") {
+      const item = items.find(i => i.id === id);
+      if (item && isExpired(item.expiryDate)) {
+        toast.error("No se puede donar merma vencida", {
+          description: "La fecha de vencimiento no debe ser anterior o igual al día de hoy."
+        });
+        return;
+      }
+    }
     try {
       const statusEndpoint = newStatus === "Donable" ? "donable" : "not-donable";
       await api.patch(`/shrinkages/${id}/${statusEndpoint}`);
@@ -578,13 +595,23 @@ export const GestionMerma = () => {
                               transition={{ duration: 0.2 }}
                               className="flex items-center justify-center gap-2"
                             >
-                              <button 
-                                onClick={() => quickChangeStatus(item.id, "Donable")}
-                                className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-100 shadow-sm"
-                                title="Marcar como Donable"
-                              >
-                                <CheckCircle2 className="w-5 h-5" />
-                              </button>
+                              {isExpired(item.expiryDate) ? (
+                                <button 
+                                  disabled
+                                  className="p-1.5 text-slate-300 bg-slate-50 border border-slate-100 rounded-lg cursor-not-allowed"
+                                  title="No se puede donar: Merma vencida"
+                                >
+                                  <CheckCircle2 className="w-5 h-5" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => quickChangeStatus(item.id, "Donable")}
+                                  className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors border border-emerald-100 shadow-sm"
+                                  title="Marcar como Donable"
+                                >
+                                  <CheckCircle2 className="w-5 h-5" />
+                                </button>
+                              )}
                               <button 
                                 onClick={() => quickChangeStatus(item.id, "No Donable")}
                                 className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100 shadow-sm"
