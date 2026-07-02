@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, ShieldCheck, Search, Plus, UserPlus, 
   CheckCircle2, XCircle, Mail, 
-  Lock, Key, Edit, Trash2, ChevronDown, Eye, EyeOff
+  Lock, Key, Edit, Trash2, ChevronDown, Eye, EyeOff,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
@@ -710,145 +711,169 @@ export const Accesos = () => {
                     <h3 className="text-xl font-bold text-slate-900">Añadir Usuario</h3>
                   </div>
                 </div>
-                
-                <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Username *</label>
-                      <input 
-                        type="text"
-                        value={userForm.username}
-                        onChange={e => setUserForm({...userForm, username: e.target.value.replace(/\s/g, "")})}
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
-                        placeholder="ej. jdoe"
-                      />
+                      {!editingUserId && roles.length === 0 ? (
+                  <div className="p-6 overflow-y-auto max-h-[70vh] text-center py-8 space-y-4">
+                    <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mx-auto mb-2">
+                      <AlertTriangle className="w-6 h-6" />
                     </div>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo (Opcional)</label>
-                      <input 
-                        type="email"
-                        value={userForm.email}
-                        onChange={e => setUserForm({...userForm, email: e.target.value})}
-                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
-                        placeholder="ej. john@fluxus.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Contraseña *</label>
-                      <div className="relative">
-                        <input 
-                          type={showPassword ? "text" : "password"}
-                          value={userForm.password}
-                          onChange={e => setUserForm({...userForm, password: e.target.value})}
-                          className="w-full px-4 py-2 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
-                          placeholder="••••••••"
-                        />
-                        <button 
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Confirmar Contraseña *</label>
-                      <div className="relative">
-                        <input 
-                          type={showConfirmPassword ? "text" : "password"}
-                          value={userForm.confirmPassword}
-                          onChange={e => setUserForm({...userForm, confirmPassword: e.target.value})}
-                          className="w-full px-4 py-2 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
-                          placeholder="••••••••"
-                        />
-                        <button 
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="relative" ref={formRoleRef}>
-                      <label className="text-sm font-semibold text-slate-700 block mb-1.5">Rol *</label>
-                      <button
-                        type="button"
-                        disabled={fullAccessRoleId !== null && userForm.role === fullAccessRoleId}
-                        onClick={() => setIsFormRoleOpen(!isFormRoleOpen)}
-                        className={cn(
-                          "flex items-center justify-between w-full px-4 py-2 bg-white border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors",
-                          fullAccessRoleId !== null && userForm.role === fullAccessRoleId
-                            ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
-                            : isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
-                        )}
-                      >
-                        <span className={cn("truncate", !userForm.role && "text-slate-500")}>
-                          {fullAccessRoleId !== null && userForm.role === fullAccessRoleId
-                            ? "RETAIL_FULL_ACCESS"
-                            : userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
-                        </span>
-                        {!(fullAccessRoleId !== null && userForm.role === fullAccessRoleId) && (
-                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
-                        )}
-                      </button>
-
-                      <AnimatePresence>
-                        {isFormRoleOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
-                          >
-                            {roles.map(r => (
-                              <button
-                                key={r.id}
-                                type="button"
-                                onClick={() => {
-                                  setUserForm({ ...userForm, role: r.id });
-                                  setIsFormRoleOpen(false);
-                                }}
-                                className={cn(
-                                  "w-full text-left px-4 py-2 text-sm transition-colors truncate",
-                                  userForm.role === r.id
-                                    ? "bg-primary/5 text-primary font-semibold"
-                                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                )}
-                              >
-                                {r.name}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
+                    <p className="text-slate-600 text-sm font-medium">
+                      Debes crear al menos un rol antes de registrar nuevos usuarios.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setIsUserModalOpen(false);
+                        setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
+                        setEditingUserId(null);
+                        setShowPassword(false);
+                        setShowConfirmPassword(false);
+                        setActiveTab("roles");
+                      }}
+                      className="px-6 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95 mx-auto block"
+                    >
+                      Ir a Crear Roles
+                    </button>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="p-6 overflow-y-auto max-h-[70vh] space-y-5">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Username *</label>
+                          <input 
+                            type="text"
+                            value={userForm.username}
+                            onChange={e => setUserForm({...userForm, username: e.target.value.replace(/\s/g, "")})}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                            placeholder="ej. jdoe"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo (Opcional)</label>
+                          <input 
+                            type="email"
+                            value={userForm.email}
+                            onChange={e => setUserForm({...userForm, email: e.target.value})}
+                            className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                            placeholder="ej. john@fluxus.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Contraseña *</label>
+                          <div className="relative">
+                            <input 
+                              type={showPassword ? "text" : "password"}
+                              value={userForm.password}
+                              onChange={e => setUserForm({...userForm, password: e.target.value})}
+                              className="w-full px-4 py-2 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                              placeholder="••••••••"
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Confirmar Contraseña *</label>
+                          <div className="relative">
+                            <input 
+                              type={showConfirmPassword ? "text" : "password"}
+                              value={userForm.confirmPassword}
+                              onChange={e => setUserForm({...userForm, confirmPassword: e.target.value})}
+                              className="w-full px-4 py-2 pr-10 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary bg-white"
+                              placeholder="••••••••"
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                            >
+                              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="relative" ref={formRoleRef}>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Rol *</label>
+                          <button
+                            type="button"
+                            disabled={fullAccessRoleId !== null && userForm.role === fullAccessRoleId}
+                            onClick={() => setIsFormRoleOpen(!isFormRoleOpen)}
+                            className={cn(
+                              "flex items-center justify-between w-full px-4 py-2 bg-white border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-colors",
+                              fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                                ? "bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed"
+                                : isFormRoleOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
+                            )}
+                          >
+                            <span className={cn("truncate", !userForm.role && "text-slate-500")}>
+                              {fullAccessRoleId !== null && userForm.role === fullAccessRoleId
+                                ? "RETAIL_FULL_ACCESS"
+                                : userForm.role ? roles.find(r => r.id === userForm.role)?.name : "Selecciona un rol"}
+                            </span>
+                            {!(fullAccessRoleId !== null && userForm.role === fullAccessRoleId) && (
+                              <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isFormRoleOpen ? "rotate-180" : "")} />
+                            )}
+                          </button>
 
-                <div className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50 justify-end shrink-0 mt-6">
-                  <button
-                    onClick={() => {
-                      setIsUserModalOpen(false);
-                      setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
-                      setEditingUserId(null);
-                      setShowPassword(false);
-                      setShowConfirmPassword(false);
-                    }}
-                    className="px-6 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 font-medium rounded-xl transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleSaveUser}
-                    className="px-8 py-2.5 text-white bg-primary hover:bg-primary/90 font-bold rounded-xl transition-colors shadow-sm"
-                  >
-                    Guardar Usuario
-                  </button>
-                </div>
+                          <AnimatePresence>
+                            {isFormRoleOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.15 }}
+                                className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
+                              >
+                                {roles.map(r => (
+                                  <button
+                                    key={r.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setUserForm({ ...userForm, role: r.id });
+                                      setIsFormRoleOpen(false);
+                                    }}
+                                    className={cn(
+                                      "w-full text-left px-4 py-2 text-sm transition-colors truncate",
+                                      userForm.role === r.id
+                                        ? "bg-primary/5 text-primary font-semibold"
+                                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                    )}
+                                  >
+                                    {r.name}
+                                  </button>
+                                ))}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 border-t border-slate-100 flex gap-3 bg-slate-50 justify-end shrink-0 mt-6">
+                      <button
+                        onClick={() => {
+                          setIsUserModalOpen(false);
+                          setUserForm({ username: "", email: "", password: "", confirmPassword: "", role: "", status: "active" });
+                          setEditingUserId(null);
+                          setShowPassword(false);
+                          setShowConfirmPassword(false);
+                        }}
+                        className="px-6 py-2.5 text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 font-medium rounded-xl transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveUser}
+                        className="px-8 py-2.5 text-white bg-primary hover:bg-primary/90 font-bold rounded-xl transition-colors shadow-sm"
+                      >
+                        Guardar Usuario
+                      </button>
+                    </div>
+                  </>
+                )}
               </motion.div>
             </div>
           )}

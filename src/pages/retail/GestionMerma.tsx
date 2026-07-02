@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 
 
 type MermaStatus = "Donable" | "No Donable" | "Solicitado" | "Pendiente" | "En Proceso" | "Donado";
@@ -174,6 +175,7 @@ const CustomSelect = ({
 export const GestionMerma = () => {
   const { hasPermission } = useAuth();
   const canRegister = hasPermission("Registrar Merma");
+  const navigate = useNavigate();
 
   // State
   const [items, setItems] = useState<MermaItem[]>([]);
@@ -719,163 +721,183 @@ export const GestionMerma = () => {
                 </div>
 
                 <div className="overflow-y-auto p-6">
-                  <form onSubmit={handleSave} className="space-y-5">
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Nombre del Producto</label>
-                      <input
-                        required
-                        type="text"
-                        value={formData.product}
-                        maxLength={50}
-                        onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                        placeholder="Ej. Lote de Manzanas"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Cantidad (Unidades)</label>
-                      <input
-                        required
-                        type="number"
-                        value={formData.quantity}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData({ ...formData, quantity: val === "" ? "" : parseInt(val) });
-                        }}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Valor Unitario (S/.)</label>
-                      <input
-                        required
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={formData.shrinkageValue}
-                        onChange={(e) => setFormData({ ...formData, shrinkageValue: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-sm font-medium text-slate-700">Fecha de Vencimiento</label>
-                      <input
-                        required
-                        type="date"
-                        value={formData.expiryDate}
-                        onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5 z-30">
-                        <label className="text-sm font-medium text-slate-700">Local</label>
-                        <CustomSelect
-                          value={formData.headquarterId}
-                          onChange={(val) => setFormData({ ...formData, headquarterId: Number(val) || "" })}
-                          placeholder="Selecciona un local"
-                          options={headquarters.map(h => ({ value: String(h.retailCompanyHeadquarterId), label: h.description }))}
-                        />
+                  {headquarters.length === 0 ? (
+                    <div className="text-center py-8 space-y-4">
+                      <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 mx-auto mb-2">
+                        <AlertTriangle className="w-6 h-6" />
                       </div>
-                      <div className="space-y-1.5 z-20">
-                        <label className="text-sm font-medium text-slate-700">Categoría</label>
-                        <CustomSelect
-                          value={formData.categoryId}
-                          onChange={(val) => setFormData({ ...formData, categoryId: Number(val) || "" })}
-                          placeholder="Selecciona una categoría"
-                          options={categories.map(c => ({ value: String(c.categoryId), label: c.name }))}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 relative" ref={reasonRef}>
-                      <label className="text-sm font-medium text-slate-700 block">Razón de Merma</label>
+                      <p className="text-slate-600 text-sm font-medium">
+                        Debes registrar al menos un local antes de registrar mermas.
+                      </p>
                       <button
-                        type="button"
-                        onClick={() => setIsReasonOpen(!isReasonOpen)}
-                        className={cn(
-                          "flex items-center justify-between w-full bg-white border rounded-xl px-4 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm",
-                          isReasonOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
-                        )}
+                        onClick={() => {
+                          setIsModalOpen(false);
+                          navigate("/retail/locales");
+                        }}
+                        className="px-6 py-2.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/90 transition-all shadow-sm hover:shadow-md active:scale-95 mx-auto block"
                       >
-                        <span className={cn("font-medium truncate", !formData.reasonId ? "text-slate-400" : "text-slate-900")}>
-                          {formData.reasonId ? reasons.find((reason) => reason.shrinkageReasonId === formData.reasonId)?.name : "Selecciona una razón"}
-                        </span>
-                        <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isReasonOpen ? "rotate-180" : "")} />
+                        Registrar Local
                       </button>
-
-                      <AnimatePresence>
-                        {isReasonOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
-                          >
-                            {reasons.map((reason) => (
-                              <button
-                                key={reason.shrinkageReasonId}
-                                type="button"
-                                onClick={() => {
-                                  setFormData({ ...formData, reasonId: reason.shrinkageReasonId });
-                                  setIsReasonOpen(false);
-                                }}
-                                className={cn(
-                                  "w-full text-left px-4 py-2 text-sm transition-colors",
-                                  formData.reasonId === reason.shrinkageReasonId
-                                    ? "bg-primary/5 text-primary font-semibold"
-                                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-                                )}
-                              >
-                                {reason.name}
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
-
-                    {reasons.find((reason) => reason.shrinkageReasonId === formData.reasonId)?.name === "Otro" && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        className="space-y-1.5"
-                      >
-                        <label className="text-sm font-medium text-slate-700">Especificar Razón</label>
+                  ) : (
+                    <form onSubmit={handleSave} className="space-y-5">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">Nombre del Producto</label>
                         <input
                           required
                           type="text"
-                          value={formData.customReason || ""}
+                          value={formData.product}
                           maxLength={50}
-                          onChange={(e) => setFormData({ ...formData, customReason: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, product: e.target.value })}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-                          placeholder="Ej. Problema de refrigeración"
+                          placeholder="Ej. Lote de Manzanas"
                         />
-                      </motion.div>
-                    )}
+                      </div>
 
-                    <div className="pt-6 border-t border-slate-100 flex gap-3 mt-8">
-                      <button
-                        type="button"
-                        onClick={() => setIsModalOpen(false)}
-                        className="flex-1 px-4 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        className="flex-1 px-4 py-2.5 text-white bg-primary hover:bg-primary/90 font-medium rounded-xl transition-colors shadow-sm"
-                      >
-                        Guardar Producto
-                      </button>
-                    </div>
-                  </form>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">Cantidad (Unidades)</label>
+                        <input
+                          required
+                          type="number"
+                          value={formData.quantity}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData({ ...formData, quantity: val === "" ? "" : parseInt(val) });
+                          }}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">Valor Unitario (S/.)</label>
+                        <input
+                          required
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0.00"
+                          value={formData.shrinkageValue}
+                          onChange={(e) => setFormData({ ...formData, shrinkageValue: e.target.value === "" ? "" : parseFloat(e.target.value) || 0 })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium text-slate-700">Fecha de Vencimiento</label>
+                        <input
+                          required
+                          type="date"
+                          value={formData.expiryDate}
+                          onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5 z-30">
+                          <label className="text-sm font-medium text-slate-700">Local</label>
+                          <CustomSelect
+                            value={formData.headquarterId}
+                            onChange={(val) => setFormData({ ...formData, headquarterId: Number(val) || "" })}
+                            placeholder="Selecciona un local"
+                            options={headquarters.map(h => ({ value: String(h.retailCompanyHeadquarterId), label: h.description }))}
+                          />
+                        </div>
+                        <div className="space-y-1.5 z-20">
+                          <label className="text-sm font-medium text-slate-700">Categoría</label>
+                          <CustomSelect
+                            value={formData.categoryId}
+                            onChange={(val) => setFormData({ ...formData, categoryId: Number(val) || "" })}
+                            placeholder="Selecciona una categoría"
+                            options={categories.map(c => ({ value: String(c.categoryId), label: c.name }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 relative" ref={reasonRef}>
+                        <label className="text-sm font-medium text-slate-700 block">Razón de Merma</label>
+                        <button
+                          type="button"
+                          onClick={() => setIsReasonOpen(!isReasonOpen)}
+                          className={cn(
+                            "flex items-center justify-between w-full bg-white border rounded-xl px-4 py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm",
+                            isReasonOpen ? "border-primary" : "border-slate-200 hover:border-slate-300"
+                          )}
+                        >
+                          <span className={cn("font-medium truncate", !formData.reasonId ? "text-slate-400" : "text-slate-900")}>
+                            {formData.reasonId ? reasons.find((reason) => reason.shrinkageReasonId === formData.reasonId)?.name : "Selecciona una razón"}
+                          </span>
+                          <ChevronDown className={cn("w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0 ml-2", isReasonOpen ? "rotate-180" : "")} />
+                        </button>
+
+                        <AnimatePresence>
+                          {isReasonOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ duration: 0.15 }}
+                              className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden"
+                            >
+                              {reasons.map((reason) => (
+                                <button
+                                  key={reason.shrinkageReasonId}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData({ ...formData, reasonId: reason.shrinkageReasonId });
+                                    setIsReasonOpen(false);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left px-4 py-2 text-sm transition-colors",
+                                    formData.reasonId === reason.shrinkageReasonId
+                                      ? "bg-primary/5 text-primary font-semibold"
+                                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                                  )}
+                                >
+                                  {reason.name}
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      {reasons.find((reason) => reason.shrinkageReasonId === formData.reasonId)?.name === "Otro" && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          className="space-y-1.5"
+                        >
+                          <label className="text-sm font-medium text-slate-700">Especificar Razón</label>
+                          <input
+                            required
+                            type="text"
+                            value={formData.customReason || ""}
+                            maxLength={50}
+                            onChange={(e) => setFormData({ ...formData, customReason: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
+                            placeholder="Ej. Problema de refrigeración"
+                          />
+                        </motion.div>
+                      )}
+
+                      <div className="pt-6 border-t border-slate-100 flex gap-3 mt-8">
+                        <button
+                          type="button"
+                          onClick={() => setIsModalOpen(false)}
+                          className="flex-1 px-4 py-2.5 text-slate-600 bg-slate-100 hover:bg-slate-200 font-medium rounded-xl transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 px-4 py-2.5 text-white bg-primary hover:bg-primary/90 font-medium rounded-xl transition-colors shadow-sm"
+                        >
+                          Guardar Producto
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </div>
               </motion.div>
             </div>
