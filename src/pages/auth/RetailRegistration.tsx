@@ -63,12 +63,20 @@ export const RetailRegistration = () => {
       toast.error("Correo inválido", { description: "Por favor, ingresa un correo electrónico válido.", id: "reg-val" });
       return;
     }
-    if (username.trim().length < 3) {
-      toast.error("Usuario muy corto", { description: "El username debe tener al menos 3 caracteres.", id: "reg-val" });
+    if (companyName.trim().length > 100) {
+      toast.error("Nombre muy largo", { description: "El nombre de la empresa no debe superar los 100 caracteres.", id: "reg-val" });
+      return;
+    }
+    if (username.trim().length < 3 || username.trim().length > 50) {
+      toast.error("Usuario inválido", { description: "El username debe tener entre 3 y 50 caracteres.", id: "reg-val" });
       return;
     }
     if (password.length < 6) {
       toast.error("Contraseña muy corta", { description: "La contraseña debe tener al menos 6 caracteres.", id: "reg-val" });
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      toast.error("Contraseña sin carácter especial", { description: "La contraseña debe incluir al menos un carácter especial (ej. !, @, #, $).", id: "reg-val" });
       return;
     }
     if (password !== confirmPassword) {
@@ -193,6 +201,7 @@ export const RetailRegistration = () => {
                           type="text"
                           required
                           value={companyName}
+                          maxLength={100}
                           onChange={(e) => setCompanyName(e.target.value)}
                           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                           placeholder="Ej. Supermercados del Centro"
@@ -224,6 +233,7 @@ export const RetailRegistration = () => {
                           type="text"
                           required
                           value={username}
+                          maxLength={50}
                           onChange={(e) => setUsername(e.target.value)}
                           className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                           placeholder="adminretail"

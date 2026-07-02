@@ -381,6 +381,14 @@ export const GestionMerma = () => {
       toast.error("Especifica la razón", { description: "Por favor, escribe la razón específica de la merma.", id: "merma-reason" });
       return;
     }
+    if (formData.product.trim().length > 50) {
+      toast.error("Nombre muy largo", { description: "El nombre del producto no debe superar los 50 caracteres.", id: "merma-name" });
+      return;
+    }
+    if (formData.customReason.trim().length > 50) {
+      toast.error("Razón muy larga", { description: "La razón específica no debe superar los 50 caracteres.", id: "merma-reason" });
+      return;
+    }
     try {
       const payload = {
         retailCompanyHeadquarterId: formData.headquarterId,
@@ -691,6 +699,7 @@ export const GestionMerma = () => {
                         required
                         type="text"
                         value={formData.product}
+                        maxLength={50}
                         onChange={(e) => setFormData({ ...formData, product: e.target.value })}
                         className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                         placeholder="Ej. Lote de Manzanas"
@@ -816,6 +825,7 @@ export const GestionMerma = () => {
                           required
                           type="text"
                           value={formData.customReason || ""}
+                          maxLength={50}
                           onChange={(e) => setFormData({ ...formData, customReason: e.target.value })}
                           className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
                           placeholder="Ej. Problema de refrigeración"
