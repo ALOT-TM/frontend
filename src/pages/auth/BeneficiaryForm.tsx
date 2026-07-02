@@ -151,12 +151,20 @@ export const BeneficiaryForm = () => {
       toast.error("Correo inválido", { description: "Por favor, ingresa un correo electrónico válido.", id: "ben-val" });
       return;
     }
-    if (username.trim().length < 3) {
-      toast.error("Usuario muy corto", { description: "El username debe tener al menos 3 caracteres.", id: "ben-val" });
+    if (institutionName.trim().length > 100) {
+      toast.error("Nombre muy largo", { description: "El nombre de la institución no debe superar los 100 caracteres.", id: "ben-val" });
+      return;
+    }
+    if (username.trim().length < 3 || username.trim().length > 50) {
+      toast.error("Usuario inválido", { description: "El username debe tener entre 3 y 50 caracteres.", id: "ben-val" });
       return;
     }
     if (password.length < 6) {
       toast.error("Contraseña muy corta", { description: "La contraseña debe tener al menos 6 caracteres.", id: "ben-val" });
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(password)) {
+      toast.error("Contraseña sin carácter especial", { description: "La contraseña debe incluir al menos un carácter especial (ej. !, @, #, $).", id: "ben-val" });
       return;
     }
     if (password !== confirmPassword) {
@@ -346,6 +354,7 @@ export const BeneficiaryForm = () => {
                     <input
                       type="text"
                       value={institutionName}
+                      maxLength={100}
                       onChange={(e) => setInstitutionName(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-sm h-[42px]"
                       placeholder="Ej. Comedor La Esperanza"
@@ -497,6 +506,7 @@ export const BeneficiaryForm = () => {
                     <input
                       type="text"
                       value={username}
+                      maxLength={50}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all shadow-sm"
                       placeholder="admin_fundacion"

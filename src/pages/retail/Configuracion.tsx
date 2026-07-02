@@ -168,6 +168,14 @@ export const Configuracion = () => {
 
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newPassword.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    if (!/[^A-Za-z0-9]/.test(newPassword)) {
+      toast.error("La contraseña debe incluir al menos un carácter especial (ej. !, @, #, $)");
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast.error("Las contraseñas no coinciden");
       return;
