@@ -946,7 +946,7 @@ export const Donaciones = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm font-semibold text-slate-700 mb-2 block">Mensaje a la Institución (Opcional)</label>
+                  <label className="text-sm font-semibold text-slate-700 mb-2 block">Mensaje a la Institución</label>
                   <textarea 
                     value={donationMessage}
                     onChange={(e) => setDonationMessage(e.target.value)}

@@ -748,7 +748,7 @@ export const Accesos = () => {
                           />
                         </div>
                         <div>
-                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo (Opcional)</label>
+                          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Correo </label>
                           <input 
                             type="email"
                             value={userForm.email}

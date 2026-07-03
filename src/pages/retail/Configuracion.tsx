@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import axios from "axios";
 import { 
   Building2, 
   Shield, 
@@ -8,19 +9,100 @@ import {
   Loader2, 
   UserCircle,
   CreditCard,
-  CheckCircle2
+  CheckCircle2,
+  CalendarDays,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { useRetailLayout } from "../../components/layouts/RetailLayout";
 import { useAuth } from "../../hooks/useAuth";
+import { planService, type PlanDto, type SubscriptionDto } from "../../services/planService";
+
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || fallback;
+  }
+  return fallback;
+};
 
 export const Configuracion = () => {
   const [activeTab, setActiveTab] = useState<"usuario" | "empresa" | "seguridad" | "suscripcion">("usuario");
   const { setCompanyName: setHeaderCompanyName, setUsername: setHeaderUsername } = useRetailLayout();
   const { hasPermission } = useAuth();
   const isFullAccess = hasPermission("Todo el sistema");
+  const [subscription, setSubscription] = useState<SubscriptionDto | null>(null);
+  const [plans, setPlans] = useState<PlanDto[]>([]);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+  const [isManagingPlan, setIsManagingPlan] = useState(false);
+  const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
+
+  const loadSubscription = useCallback(async () => {
+    setIsLoadingSubscription(true);
+    try {
+      const availablePlans = await planService.getPlans();
+      setPlans(availablePlans);
+
+      try {
+        setSubscription(await planService.getCurrentSubscription());
+      } catch (error) {
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          setSubscription(null);
+        } else {
+          throw error;
+        }
+      }
+    } catch {
+      toast.error("No se pudo cargar la suscripción.");
+    } finally {
+      setIsLoadingSubscription(false);
+    }
+  }, []);
+
+  const handleChangePlan = async (plan: PlanDto) => {
+    if (!subscription || plan.planId === subscription.plan.planId) return;
+    if (!window.confirm(`¿Cambiar del plan ${subscription.plan.name} al plan ${plan.name}?`)) return;
+
+    setIsUpdatingSubscription(true);
+    try {
+      const updated = await planService.changeCurrentPlan(plan.planId);
+      setSubscription(updated);
+      toast.success(`Plan actualizado a ${updated.plan.name}.`);
+    } catch {
+      toast.error("No se pudo cambiar el plan.");
+    } finally {
+      setIsUpdatingSubscription(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!subscription || !window.confirm("¿Cancelar la renovación de la suscripción?")) return;
+
+    setIsUpdatingSubscription(true);
+    try {
+      setSubscription(await planService.cancelCurrentSubscription());
+      toast.success("La renovación fue cancelada.");
+    } catch {
+      toast.error("No se pudo cancelar la renovación.");
+    } finally {
+      setIsUpdatingSubscription(false);
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    if (!subscription) return;
+
+    setIsUpdatingSubscription(true);
+    try {
+      setSubscription(await planService.reactivateCurrentSubscription());
+      toast.success("La suscripción fue reactivada.");
+    } catch {
+      toast.error("No se pudo reactivar la suscripción.");
+    } finally {
+      setIsUpdatingSubscription(false);
+    }
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
@@ -43,7 +125,16 @@ export const Configuracion = () => {
   const [initialUsername, setInitialUsername] = useState("");
   const [initialEmail, setInitialEmail] = useState("");
   const [isSavingUser, setIsSavingUser] = useState(false);
-  const [hasUserChanges, setHasUserChanges] = useState(false);
+
+  // --- Configuración de Empresa State ---
+  const [companyName, setCompanyName] = useState("");
+  const [initialCompanyName, setInitialCompanyName] = useState("");
+  const [companyPhone, setCompanyPhone] = useState("+1 234 567 8900");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+  const hasUserChanges = username !== initialUsername || userRecoveryEmail !== initialEmail;
+  const hasCompanyChanges = companyName !== initialCompanyName && companyName !== "";
 
   const parseJwtUserId = () => {
     const token = localStorage.getItem("token");
@@ -87,13 +178,6 @@ export const Configuracion = () => {
     })();
   }, []);
 
-  useEffect(() => {
-    setHasUserChanges(
-      username !== initialUsername || 
-      userRecoveryEmail !== initialEmail
-    );
-  }, [username, userRecoveryEmail, initialUsername, initialEmail]);
-
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingUser(true);
@@ -109,27 +193,12 @@ export const Configuracion = () => {
       setInitialEmail(updatedUser.email);
       setHeaderUsername(updatedUser.username);
       toast.success("Perfil de usuario actualizado");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Error al actualizar perfil");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Error al actualizar perfil"));
     } finally {
       setIsSavingUser(false);
     }
   };
-
-  // --- Configuración de Empresa State ---
-  const [companyName, setCompanyName] = useState("");
-  const [initialCompanyName, setInitialCompanyName] = useState("");
-  const [companyPhone, setCompanyPhone] = useState("+1 234 567 8900");
-  const [userCreatedAt, setUserCreatedAt] = useState("");
-  const [isSavingCompany, setIsSavingCompany] = useState(false);
-  const [hasCompanyChanges, setHasCompanyChanges] = useState(false);
-
-  useEffect(() => {
-    setHasCompanyChanges(
-      companyName !== initialCompanyName && 
-      companyName !== ""
-    );
-  }, [companyName, initialCompanyName]);
 
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,8 +219,8 @@ export const Configuracion = () => {
         setHeaderCompanyName(updatedName);
         toast.success("Datos de empresa actualizados");
       }
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Error al actualizar la empresa");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Error al actualizar la empresa"));
     } finally {
       setIsSavingCompany(false);
     }
@@ -190,8 +259,8 @@ export const Configuracion = () => {
       setNewPassword("");
       setConfirmPassword("");
       toast.success("Contraseña actualizada correctamente");
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Error al actualizar contraseña");
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, "Error al actualizar contraseña"));
     } finally {
       setIsSavingPassword(false);
     }
@@ -248,7 +317,10 @@ export const Configuracion = () => {
               Seguridad
             </button>
             <button
-              onClick={() => setActiveTab("suscripcion")}
+              onClick={() => {
+                setActiveTab("suscripcion");
+                void loadSubscription();
+              }}
               className={cn(
                 "flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all",
                 activeTab === "suscripcion"
@@ -510,64 +582,54 @@ export const Configuracion = () => {
                 exit={{ opacity: 0, y: -15, transition: { duration: 0.2, ease: "easeIn" } }}
                 className="bg-white border border-slate-200/60 p-8 rounded-2xl shadow-sm"
               >
-                <div className="space-y-8">
-                  {/* Plan Info */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between p-6 bg-slate-900 rounded-2xl text-white shadow-md">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                        <h3 className="text-lg font-bold">Plan Enterprise</h3>
-                      </div>
-                      <p className="text-slate-400 text-sm">Tu suscripción se renueva el 15 de Octubre de 2026.</p>
-                    </div>
-                    <div className="mt-4 md:mt-0">
-                      <button 
-                        disabled={!isFullAccess}
-                        className="px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        Gestionar Plan
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Usage Bars */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-slate-900 rounded-2xl text-white shadow-md">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-6">Uso y Límites</h3>
-                    
-                    <div className="space-y-6">
-                      {/* Locales */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-slate-700">Locales utilizados</span>
-                          <span className="text-slate-500"><strong className="text-slate-900">8</strong> de 10</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: "80%" }} />
-                        </div>
-                      </div>
-
-                      {/* Usuarios */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-slate-700">Usuarios activos</span>
-                          <span className="text-slate-500"><strong className="text-slate-900">5</strong> de 20</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{ width: "25%" }} />
-                        </div>
-                      </div>
-
-                      {/* Almacenamiento */}
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium text-slate-700">Almacenamiento de merma</span>
-                          <span className="text-slate-500"><strong className="text-slate-900">45%</strong> de 500GB</span>
-                        </div>
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-400 rounded-full transition-all duration-1000" style={{ width: "45%" }} />
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      {isLoadingSubscription ? (
+                        <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className={cn(
+                          "w-5 h-5",
+                          subscription?.status === "ACTIVE" ? "text-emerald-400" : "text-amber-400"
+                        )} />
+                      )}
+                      <h3 className="text-lg font-bold">
+                        {isLoadingSubscription
+                          ? "Cargando plan..."
+                          : subscription
+                            ? `Plan ${subscription.plan.name}`
+                            : "Sin suscripción registrada"}
+                      </h3>
+                      {subscription && (
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-xs font-semibold",
+                          subscription.status === "ACTIVE"
+                            ? "bg-emerald-400/15 text-emerald-300"
+                            : "bg-amber-400/15 text-amber-300"
+                        )}>
+                          {subscription.status === "ACTIVE" ? "Activa" : subscription.status === "CANCELLED" ? "Cancelada" : "Pendiente"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-400 text-sm">
+                      <CalendarDays className="w-4 h-4 shrink-0" />
+                      <p>
+                        {!subscription
+                          ? "No se encontró una suscripción asociada a tu empresa."
+                          : subscription.status === "CANCELLED"
+                            ? `La renovación está cancelada. El acceso finaliza el ${formatDate(subscription.endDate || undefined)}.`
+                            : `Tu suscripción se renueva el ${formatDate(subscription.endDate || undefined)}.`}
+                      </p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsManagingPlan(true)}
+                    disabled={!isFullAccess || isLoadingSubscription || !subscription}
+                    className="shrink-0 px-6 py-2.5 bg-white text-slate-900 font-bold rounded-xl hover:bg-slate-100 transition-colors shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Gestionar Plan
+                  </button>
                 </div>
               </motion.div>
             )}
@@ -575,6 +637,131 @@ export const Configuracion = () => {
           </AnimatePresence>
         </main>
       </div>
+
+      <AnimatePresence>
+        {isManagingPlan && subscription && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => !isUpdatingSubscription && setIsManagingPlan(false)}
+          >
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="manage-plan-title"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              onClick={(event) => event.stopPropagation()}
+              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            >
+              <div className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-200 bg-white px-6 py-5">
+                <div>
+                  <h2 id="manage-plan-title" className="text-xl font-bold text-slate-900">Gestionar plan</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Plan actual: <strong className="text-slate-700">{subscription.plan.name}</strong>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsManagingPlan(false)}
+                  disabled={isUpdatingSubscription}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="p-6">
+                <div className="grid gap-4 md:grid-cols-3">
+                  {plans.map((plan) => {
+                    const isCurrentPlan = plan.planId === subscription.plan.planId;
+                    return (
+                      <div
+                        key={plan.planId}
+                        className={cn(
+                          "flex flex-col rounded-2xl border p-5 transition-colors",
+                          isCurrentPlan ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-slate-200"
+                        )}
+                      >
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+                            {isCurrentPlan && (
+                              <span className="rounded-full bg-primary px-2 py-1 text-xs font-semibold text-white">
+                                Actual
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-2xl font-extrabold text-slate-900">
+                            ${Number(plan.price).toFixed(2)}
+                            <span className="text-sm font-normal text-slate-500"> / mes</span>
+                          </p>
+                        </div>
+
+                        <ul className="mb-6 space-y-2 text-sm text-slate-600">
+                          <li>{plan.maxUsers >= 999 ? "Usuarios ilimitados" : `Hasta ${plan.maxUsers} usuarios`}</li>
+                          <li>{plan.maxStorage >= 99999 ? "Registros ilimitados" : `Hasta ${plan.maxStorage.toLocaleString("es-PE")} registros`}</li>
+                        </ul>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleChangePlan(plan)}
+                          disabled={isCurrentPlan || isUpdatingSubscription || subscription.status !== "ACTIVE"}
+                          className={cn(
+                            "mt-auto rounded-xl px-4 py-2.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                            isCurrentPlan
+                              ? "bg-slate-100 text-slate-500"
+                              : "bg-primary text-white hover:bg-primary/90"
+                          )}
+                        >
+                          {isCurrentPlan ? "Plan actual" : "Cambiar a este plan"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-slate-900">
+                      {subscription.status === "CANCELLED" ? "Renovación cancelada" : "Renovación automática"}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {subscription.status === "CANCELLED"
+                        ? `Tu acceso finaliza el ${formatDate(subscription.endDate || undefined)}.`
+                        : `La próxima renovación es el ${formatDate(subscription.endDate || undefined)}.`}
+                    </p>
+                  </div>
+
+                  {subscription.status === "CANCELLED" ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleReactivateSubscription()}
+                      disabled={isUpdatingSubscription}
+                      className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {isUpdatingSubscription ? "Procesando..." : "Reactivar suscripción"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void handleCancelSubscription()}
+                      disabled={isUpdatingSubscription}
+                      className="rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {isUpdatingSubscription ? "Procesando..." : "Cancelar renovación"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

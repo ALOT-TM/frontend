@@ -292,7 +292,7 @@ export const ConfiguracionBeneficiario = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700 block">Notas o Referencias (Opcional)</label>
+              <label className="text-sm font-medium text-slate-700 block">Notas o Referencias</label>
               <div className="relative">
                 <FileText className="absolute left-3 top-4 text-slate-400 w-5 h-5" />
                 <textarea
