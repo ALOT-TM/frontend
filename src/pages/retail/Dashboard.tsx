@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   AreaChart,
   Area,
@@ -7,16 +7,23 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { DollarSign, Users, Shield, PackageX, HeartHandshake, Calendar, ChevronDown } from "lucide-react";
 import { cn } from "../../utils/cn";
 import { api } from "../../services/api";
 import { toast } from "sonner";
-import { useExcelExport, type ExcelColumn } from "../../hooks/useExcelExport";
+import { exportManagementReport, type ManagementReportSection } from "../../utils/exportManagementReport";
 
 // Empty baseline until the backend returns real metrics.
-const defaultTrendData = [
+interface TrendData {
+  name: string;
+  merma: number;
+  donada: number;
+}
+
+const defaultTrendData: TrendData[] = [
   { name: "Ene", merma: 0, donada: 0 },
   { name: "Feb", merma: 0, donada: 0 },
   { name: "Mar", merma: 0, donada: 0 },
@@ -30,7 +37,7 @@ export const Dashboard = () => {
   const [selectedDateFilter, setSelectedDateFilter] = useState("Últimos 30 días");
   const filterRef = useRef<HTMLDivElement>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
-  const { exportToExcel, isExporting } = useExcelExport();
+  const [isExporting, setIsExporting] = useState(false);
 
   // Real API States
   const [totalShrinkageMonth, setTotalShrinkageMonth] = useState<number>(0);
@@ -38,7 +45,7 @@ export const Dashboard = () => {
   const [donatedTotal, setDonatedTotal] = useState<number>(0);
   const [activeUsers, setActiveUsers] = useState<number>(0);
   const [configuredRoles, setConfiguredRoles] = useState<number>(0);
-  const [chartData, setChartData] = useState<any[]>(defaultTrendData);
+  const [chartData, setChartData] = useState<TrendData[]>(defaultTrendData);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,60 +86,82 @@ export const Dashboard = () => {
   }, [selectedDateFilter]);
 
   const handleDownloadReport = async () => {
+    setIsExporting(true);
     try {
       const response = await api.get("/retail/dashboard/report", { responseType: "text" });
-      const csvText = response.data;
-      
-      // Parsear CSV básico
-      const lines = csvText.trim().split('\n');
-      if (lines.length < 1) {
-          toast.error("El reporte está vacío.");
-          return;
+      const lines = String(response.data || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+
+      const parseCsvLine = (line: string): string[] => {
+        const values: string[] = [];
+        let value = '';
+        let insideQuotes = false;
+
+        for (let index = 0; index < line.length; index += 1) {
+          const character = line[index];
+          if (character === '"') {
+            if (insideQuotes && line[index + 1] === '"') {
+              value += '"';
+              index += 1;
+            } else {
+              insideQuotes = !insideQuotes;
+            }
+          } else if (character === ',' && !insideQuotes) {
+            values.push(value.trim());
+            value = '';
+          } else {
+            value += character;
+          }
+        }
+
+        values.push(value.trim());
+        return values;
+      };
+
+      const findSection = (name: string) => lines.findIndex((line) => parseCsvLine(line)[0] === name);
+      const shrinkagesIndex = findSection('MERMAS REGISTRADAS');
+      const donationsIndex = findSection('DONACIONES REALIZADAS');
+
+      if (shrinkagesIndex < 0 || donationsIndex < 0) {
+        throw new Error('El formato del reporte recibido no es válido.');
       }
-      
-      const headers = lines[0].split(',').map((h: string) => h.trim().replace(/^"|"$/g, ''));
-      const data = lines.slice(1).map((line: string) => {
-        // Separador rudimentario de CSV que soporta comillas simples o sin comillas
-        const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || line.split(',');
-        const row: Record<string, any> = {};
-        headers.forEach((header: string, index: number) => {
-          let val = values[index]?.trim() || '';
-          if (val.startsWith('"') && val.endsWith('"')) {
-              val = val.substring(1, val.length - 1);
-          }
-          row[header] = val;
-        });
-        return row;
-      });
 
-      const columnsConfig: ExcelColumn<Record<string, any>>[] = headers.map((header: string) => {
-          // Inferir tipo básico
-          let type: 'text' | 'number' | 'currency' | 'date' = 'text';
-          const sample = data[0]?.[header];
-          if (sample) {
-              if (/^\d{4}-\d{2}-\d{2}/.test(sample) || /^\d{2}\/\d{2}\/\d{4}/.test(sample)) {
-                  type = 'date';
-              } else if (/^\$|soles|PEN/i.test(sample) || (/^\d+\.\d{2}$/.test(sample) && (header.toLowerCase().includes('monto') || header.toLowerCase().includes('valor') || header.toLowerCase().includes('precio')))) {
-                  type = 'currency';
-              } else if (/^\d+$/.test(sample) || /^\d+\.\d+$/.test(sample)) {
-                  type = 'number';
-              }
-          }
-          return { header, key: header, type };
-      });
+      const toSection = (title: string, startIndex: number, endIndex: number): ManagementReportSection => {
+        const headers = parseCsvLine(lines[startIndex + 1] || '');
+        const rows = lines
+          .slice(startIndex + 2, endIndex)
+          .filter((line) => line.trim().length > 0)
+          .map(parseCsvLine)
+          .map((values) => {
+            const hasMonetaryColumns = headers.includes('Valor Unitario') && headers.includes('Valor Total');
+            if (hasMonetaryColumns && values.length === headers.length + 2) {
+              return [
+                ...values.slice(0, 5),
+                `${values[5]}.${values[6]}`,
+                `${values[7]}.${values[8]}`,
+                ...values.slice(9),
+              ];
+            }
+            return values.slice(0, headers.length);
+          });
 
-      await exportToExcel({
-        data,
-        columns: columnsConfig,
-        fileName: 'reporte_gestion',
-        sheetName: 'Reporte',
-        dashboardRef: dashboardRef
+        return { title, headers, rows };
+      };
+
+      await exportManagementReport({
+        title: 'REPORTE DE GESTIÓN - MERMAS Y DONACIONES',
+        sections: [
+          toSection('Mermas registradas', shrinkagesIndex, donationsIndex),
+          toSection('Donaciones realizadas', donationsIndex, lines.length),
+        ],
+        dashboardElement: dashboardRef.current,
       });
       
       toast.success("Reporte Excel generado correctamente.");
     } catch (error) {
       console.error(error);
       toast.error("No se pudo descargar el reporte.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -195,7 +224,7 @@ export const Dashboard = () => {
     },
   };
 
-  const itemVariants: any = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
   };
@@ -316,8 +345,8 @@ export const Dashboard = () => {
               margin={{
                 top: 10,
                 right: 30,
-                left: 0,
-                bottom: 0,
+                left: 28,
+                bottom: 28,
               }}
             >
               <defs>
@@ -331,8 +360,44 @@ export const Dashboard = () => {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dx={-10} />
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748b' }}
+                dy={10}
+                label={{
+                  value: selectedDateFilter === "Últimos 7 días" || selectedDateFilter === "Últimos 30 días"
+                    ? "Fecha"
+                    : "Mes",
+                  position: "insideBottom",
+                  offset: -20,
+                  fill: "#334155",
+                  fontWeight: 600,
+                }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: '#64748b' }}
+                dx={-10}
+                allowDecimals={false}
+                label={{
+                  value: "Cantidad de productos",
+                  angle: -90,
+                  position: "insideLeft",
+                  offset: -12,
+                  fill: "#334155",
+                  fontWeight: 600,
+                }}
+              />
+              <Legend
+                verticalAlign="top"
+                align="right"
+                height={36}
+                iconType="square"
+                wrapperStyle={{ fontSize: "13px", color: "#334155" }}
+              />
               <Tooltip
                 contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                 itemStyle={{ color: '#0f172a', fontWeight: 500 }}
@@ -340,7 +405,7 @@ export const Dashboard = () => {
               <Area
                 type="monotone"
                 dataKey="merma"
-                name="Mermados"
+                name="Productos mermados"
                 stroke="#1e3a8a"
                 strokeWidth={3}
                 fillOpacity={1}
@@ -349,7 +414,7 @@ export const Dashboard = () => {
               <Area
                 type="monotone"
                 dataKey="donada"
-                name="Donados"
+                name="Productos donados"
                 stroke="#10b981"
                 strokeWidth={3}
                 fillOpacity={1}

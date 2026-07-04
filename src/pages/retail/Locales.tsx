@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import { Plus, Edit2, Trash2, MapPin, Store, AlertTriangle, X, PackageX, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "../../utils/cn";
@@ -42,10 +42,38 @@ interface ProfileDto {
   retailCompanyId?: number | null;
 }
 
+interface ShrinkageDto {
+  retailCompanyHeadquarterId: number;
+  quantity: number;
+}
+
 interface Option {
   value: string;
   label: string;
 }
+
+const mapHeadquartersToLocales = (
+  headquarters: RetailCompanyHeadquarterDto[],
+  shrinkages: ShrinkageDto[],
+  companyId: number | null
+): Local[] => {
+  const shrinkageByHeadquarter = shrinkages.reduce<Map<number, number>>((totals, shrinkage) => {
+    const headquarterId = Number(shrinkage.retailCompanyHeadquarterId);
+    const quantity = Number(shrinkage.quantity) || 0;
+    totals.set(headquarterId, (totals.get(headquarterId) || 0) + quantity);
+    return totals;
+  }, new Map());
+
+  return headquarters
+    .filter((item) => !companyId || item.retailCompany?.retailCompanyId === companyId)
+    .map((item) => ({
+      id: item.retailCompanyHeadquarterId,
+      name: item.description,
+      address: item.address?.street1 || "",
+      city: item.address?.city || "",
+      merma: shrinkageByHeadquarter.get(item.retailCompanyHeadquarterId) || 0,
+    }));
+};
 
 const CustomSelect = ({ 
   options, 
@@ -144,17 +172,19 @@ export const Locales = () => {
     const loadData = async () => {
       setIsLoading(true);
       try {
-        const [profileResponse, countriesResponse, headquartersResponse] = await Promise.all([
+        const [profileResponse, countriesResponse, headquartersResponse, shrinkagesResponse] = await Promise.all([
           api.get("/auth/profile"),
           api.get("/countries"),
           api.get("/retail-company-headquarters"),
+          api.get("/shrinkages/company"),
         ]);
         const profile = (profileResponse.data || {}) as ProfileDto;
         setRetailCompanyId(profile.retailCompanyId ?? null);
         setCountries(countriesResponse.data || []);
         const hqs = (headquartersResponse.data || []) as RetailCompanyHeadquarterDto[];
+        const shrinkages = (shrinkagesResponse.data || []) as ShrinkageDto[];
         setHeadquarters(hqs);
-        setLocales(mapHeadquartersToLocales(hqs, profile.retailCompanyId ?? null));
+        setLocales(mapHeadquartersToLocales(hqs, shrinkages, profile.retailCompanyId ?? null));
       } catch {
         toast.error("No se pudieron cargar los locales.");
       } finally {
@@ -170,7 +200,7 @@ export const Locales = () => {
     show: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
-  const cardVariants: any = {
+  const cardVariants: Variants = {
     hidden: { opacity: 0, y: 20 },
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } },
   };
@@ -311,26 +341,15 @@ export const Locales = () => {
     }
   };
 
-  const mapHeadquartersToLocales = (
-    headquarters: RetailCompanyHeadquarterDto[],
-    companyId: number | null
-  ): Local[] => {
-    return headquarters
-      .filter((item) => !companyId || item.retailCompany?.retailCompanyId === companyId)
-      .map((item) => ({
-        id: item.retailCompanyHeadquarterId,
-        name: item.description,
-        address: item.address?.street1 || "",
-        city: item.address?.city || "",
-        merma: 0,
-      }));
-  };
-
   const reloadLocales = async (companyId: number | null) => {
-    const response = await api.get("/retail-company-headquarters");
-    const hqs = (response.data || []) as RetailCompanyHeadquarterDto[];
+    const [headquartersResponse, shrinkagesResponse] = await Promise.all([
+      api.get("/retail-company-headquarters"),
+      api.get("/shrinkages/company"),
+    ]);
+    const hqs = (headquartersResponse.data || []) as RetailCompanyHeadquarterDto[];
+    const shrinkages = (shrinkagesResponse.data || []) as ShrinkageDto[];
     setHeadquarters(hqs);
-    setLocales(mapHeadquartersToLocales(hqs, companyId));
+    setLocales(mapHeadquartersToLocales(hqs, shrinkages, companyId));
   };
 
   return (
@@ -481,7 +500,7 @@ export const Locales = () => {
                     </div>
                     
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-sm font-medium text-slate-700">Dirección Secundaria <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                      <label className="text-sm font-medium text-slate-700">Dirección Secundaria <span className="text-slate-400 font-normal"></span></label>
                       <input
                         type="text"
                         value={formData.street2}
@@ -526,7 +545,7 @@ export const Locales = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-slate-700">Código Postal <span className="text-slate-400 font-normal">(Opcional)</span></label>
+                      <label className="text-sm font-medium text-slate-700">Código Postal <span className="text-slate-400 font-normal"></span></label>
                       <input
                         type="text"
                         value={formData.postalCode}

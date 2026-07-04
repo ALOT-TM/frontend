@@ -415,7 +415,7 @@ export const BeneficiaryForm = () => {
                   </div>
 
                   <div className="space-y-1.5 md:col-span-2">
-                    <label className="text-sm font-medium text-slate-700">Direccion complementaria (opcional)</label>
+                    <label className="text-sm font-medium text-slate-700">Direccion complementaria</label>
                     <div className="relative">
                       <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                       <input
